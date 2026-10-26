@@ -1,8 +1,8 @@
 # Security policy
 
-Report credential exposure, cross-member access, or account authorization bypasses privately through [GitHub security advisories](https://github.com/sep1ol/teamclaude/security/advisories/new). Do not put credentials, personal prompts, or exploit details in public issues. If private reporting is unavailable, open an issue requesting a private contact without including vulnerability details.
+Report credential exposure, cross-member access, or account authorization bypasses privately through [GitHub security advisories](https://github.com/sep1ol/relaycrew/security/advisories/new). Do not put credentials, personal prompts, or exploit details in public issues. If private reporting is unavailable, open an issue requesting a private contact without including vulnerability details.
 
-The maintained fork is [sep1ol/teamclaude](https://github.com/sep1ol/teamclaude). The original project is [KarpelesLab/teamclaude](https://github.com/KarpelesLab/teamclaude). This fork retains the original MIT license and is maintained independently.
+The maintained fork is [sep1ol/relaycrew](https://github.com/sep1ol/relaycrew). The original project is [KarpelesLab/teamclaude](https://github.com/KarpelesLab/teamclaude). This fork retains the original MIT license and is maintained independently.
 
 Run the gateway under a dedicated Unix account. Keep its configuration, state, logs, and certificate private keys private. Use HTTPS or an SSH tunnel for remote clients. Run one replica; member concurrency enforcement is local to the gateway process.
 

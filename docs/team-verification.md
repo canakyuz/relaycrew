@@ -34,4 +34,4 @@ Final full-suite and publication results are appended after integration and inde
 
 To repeat the container check after building the image, mount `test-helpers/team-container-smoke.mjs` at `/smoke.mjs` and run it through `docker-entrypoint.sh` with an empty tmpfs at `/data`. The script refuses to run without an explicit container configuration path.
 
-The independent review and corrected findings are recorded in [team review](team-review.md). The repository is published under `sep1ol/teamclaude`; `main` contains the implementation. No npm registry release or production deployment is part of this delivery.
+The independent review and corrected findings are recorded in [team review](team-review.md). The repository is published under `sep1ol/relaycrew`; `main` contains the implementation. No npm registry release or production deployment is part of this delivery.

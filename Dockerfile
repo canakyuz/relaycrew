@@ -8,7 +8,7 @@ ARG VCS_REF=unknown
 ARG BUILD_DATE
 LABEL org.opencontainers.image.title="teamclaude" \
       org.opencontainers.image.description="Team gateway for Claude Code and Codex" \
-      org.opencontainers.image.source="https://github.com/sep1ol/teamclaude" \
+      org.opencontainers.image.source="https://github.com/sep1ol/relaycrew" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${VCS_REF}" \
