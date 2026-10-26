@@ -21,7 +21,7 @@ import { getConfigPath } from './config.js';
 import { safeLine } from './safe-text.js';
 import { envVar } from './brand.js';
 
-export const PKG_NAME = '@karpeleslab/teamclaude';
+export const PKG_NAME = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).name;
 const REGISTRY = 'https://registry.npmjs.org';
 const DAY_MS = 24 * 60 * 60 * 1000;
 // Wide enough for `v1.2.3-rc.1+build`, narrow enough that a tag cannot be the

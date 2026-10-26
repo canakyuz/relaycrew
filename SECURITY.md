@@ -1,46 +1,11 @@
-# Security Policy
+# Security policy
 
-## Reporting a vulnerability
+Report credential exposure, cross-member access, or account authorization bypasses privately through [GitHub security advisories](https://github.com/sep1ol/teamclaude/security/advisories/new). Do not put credentials, personal prompts, or exploit details in public issues. If private reporting is unavailable, open an issue requesting a private contact without including vulnerability details.
 
-If you discover a security vulnerability in TeamClaude, please report it
-privately rather than opening a public issue.
+The maintained fork is [sep1ol/teamclaude](https://github.com/sep1ol/teamclaude). The original project is [KarpelesLab/teamclaude](https://github.com/KarpelesLab/teamclaude). This fork retains the original MIT license and is maintained independently.
 
-- Use GitHub's [private vulnerability reporting](https://github.com/KarpelesLab/teamclaude/security/advisories/new)
-  ("Report a vulnerability" under the **Security** tab), or
-- Email the maintainers at the address listed on the
-  [KarpelesLab organization page](https://github.com/KarpelesLab).
+Run the gateway under a dedicated Unix account. Keep its configuration, state, logs, and certificate private keys private. Use HTTPS or an SSH tunnel for remote clients. Run one replica; member concurrency enforcement is local to the gateway process.
 
-Please include enough detail to reproduce the issue (affected version, steps,
-and impact). We aim to acknowledge reports within a few days.
+Team mode is opt-in. Give developers member keys. Keep `proxy.apiKey`, provider credentials, management MCP, and fleet status restricted to administrators. A member key can spend every account explicitly granted to it, so treat wildcard grants as access to all current and future accounts.
 
-## Supported versions
-
-Only the latest published release on the `master` branch and the
-[`@karpeleslab/teamclaude`](https://www.npmjs.com/package/@karpeleslab/teamclaude)
-npm package receive security fixes.
-
-## Verifying you have the genuine project
-
-TeamClaude has been impersonated by malicious soft-forks that preserve the
-original commit history (and even the `@karpeleslab/teamclaude` package name)
-while bundling malware — typically a binary hidden in the repository and an
-install step that runs it.
-
-Only the following sources are canonical:
-
-- **Repository:** https://github.com/KarpelesLab/teamclaude
-- **npm package:** `@karpeleslab/teamclaude` (published by KarpelesLab)
-
-Treat any other copy with caution. In particular:
-
-- **Do not** download and run "TeamClaude" archives (`.zip`, etc.) linked from
-  third-party repositories or READMEs. TeamClaude is distributed via npm and the
-  canonical GitHub repository only — it is never shipped as a downloadable
-  binary archive.
-- Install with `npm install -g @karpeleslab/teamclaude` and verify the package
-  scope is `@karpeleslab`.
-- Be suspicious of any fork that instructs you to extract an archive and then
-  run `npm install` / `npm start` against its contents.
-
-If you believe you have found a malicious copy, please report it to GitHub and,
-if convenient, let us know via the channels above so we can warn other users.
+Only repository files and synthetic fixtures belong in commits. The `data/` directory is excluded from Git and the Docker build context. A gateway key, provider token, or private key must never be pasted into an issue, test result, or screenshot.

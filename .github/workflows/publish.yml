@@ -1,6 +1,6 @@
 name: Publish
 
-# Publish to npm whenever a version bump lands on master. The job compares the
+# Publish to npm whenever a version bump lands on main. The job compares the
 # package.json version against what is already on npm, so it only publishes when
 # the version is new — merging any other PR is a no-op. Publishing is idempotent:
 # re-running on the same version simply skips.
@@ -9,16 +9,8 @@ name: Publish
 # npm mints a short-lived credential from the GitHub OIDC token at publish time,
 # and provenance is attached automatically. This requires a one-time setup on
 # npmjs.com: on the package's Settings → Trusted Publisher, add a GitHub Actions
-# publisher for owner KarpelesLab, repo teamclaude, workflow "publish.yml".
+# publisher for owner sep1ol, repo teamclaude, workflow "publish.yml".
 on:
-  push:
-    branches: [master]
-    paths:
-      - 'package.json'
-  # Manual trigger: publish the version currently on master on demand. Useful to
-  # backfill a version that was bumped before this workflow existed, or to re-run
-  # after fixing the npm Trusted Publisher setup. The npm-view check below still
-  # gates it, so a manual run on an already-published version is a safe no-op.
   workflow_dispatch:
 
 jobs:

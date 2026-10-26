@@ -79,11 +79,11 @@ async function runUpdate({ pkgDir, npmRoot }) {
 // "Updated", and leave the pnpm copy, the one on PATH, on the old version.
 test('update from a pnpm copy names the pnpm command and never runs npm', { skip: process.platform === 'win32' }, async () => {
   const result = await runUpdate({
-    pkgDir: 'pnpm/global/v11/node_modules/.pnpm/@karpeleslab+teamclaude@1.1.25/node_modules/@karpeleslab/teamclaude',
+    pkgDir: 'pnpm/global/v11/node_modules/.pnpm/@sep1ol+teamclaude@1.1.25/node_modules/@sep1ol/teamclaude',
     npmRoot: 'lib/node_modules',
   });
   assert.equal(result.code, 0, result.stderr);
-  assert.match(result.stdout, /^This copy was installed with pnpm, which npm cannot update\. Run: pnpm add -g @karpeleslab\/teamclaude@latest$/m);
+  assert.match(result.stdout, /^This copy was installed with pnpm, which npm cannot update\. Run: pnpm add -g @sep1ol\/teamclaude@latest$/m);
   assert.doesNotMatch(result.stdout, /Updat(?:ing|ed) /);
   assert.equal(result.npmCalls, '');
 });
@@ -92,10 +92,10 @@ test('update from a pnpm copy names the pnpm command and never runs npm', { skip
 // install, so the empty record above is the command's doing.
 test('update from an npm global copy still installs with npm', { skip: process.platform === 'win32' }, async () => {
   const result = await runUpdate({
-    pkgDir: 'lib/node_modules/@karpeleslab/teamclaude',
+    pkgDir: 'lib/node_modules/@sep1ol/teamclaude',
     npmRoot: 'lib/node_modules',
   });
   assert.equal(result.code, 0, result.stderr);
   assert.match(result.stdout, /^Updated to 999\.0\.0\./m);
-  assert.match(result.npmCalls, /^install -g @karpeleslab\/teamclaude@999\.0\.0$/m);
+  assert.match(result.npmCalls, /^install -g @sep1ol\/teamclaude@999\.0\.0$/m);
 });

@@ -1,5 +1,7 @@
 # Configuration
 
+For this fork's team mode, member grants, and VPS deployment, see [team operations](teams.md). With `proxy.teamMode: true`, the team boundary overrides the individual-mode key and localhost behavior described below.
+
 ## Where it lives
 
 Config is stored at `~/.config/teamclaude.json` (or `$XDG_CONFIG_HOME/teamclaude.json`). A random proxy API key is generated on first use.

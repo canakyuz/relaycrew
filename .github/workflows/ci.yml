@@ -3,9 +3,9 @@ name: CI
 on:
   workflow_dispatch:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
-    branches: [master]
+    branches: [main]
 
 jobs:
   node:
@@ -47,8 +47,8 @@ jobs:
 
       # The strict-mode ratchet (scripts/typecheck-strict.mjs): strict
       # diagnostics per file may not grow against the pre-merge commit. For a
-      # pull request the checkout is the merge of the branch into master and
-      # the base is master's tip; for a push to master it is the previous tip.
+      # pull request the checkout is the merge of the branch into main and
+      # the base is main's tip; for a push to main it is the previous tip.
       # The base commit is fetched on its own, since the checkout is shallow.
       - name: Strict typecheck ratchet
         if: matrix.node == 24 && (github.event_name == 'pull_request' || github.event_name == 'push')

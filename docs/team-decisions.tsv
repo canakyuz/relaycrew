@@ -1,0 +1,12 @@
+ts	phase	decision	why	evidence	result
+2026-10-26T12:49:00Z	frame	Keep upstream history and publish a public fork on main	The owner explicitly requested a public fork and ordered commits	LICENSE	Local main based on d50ca5c
+2026-10-26T12:55:00Z	baseline	Capture the complete upstream suite before changes	Separate existing failures from regressions	docs/team-verification.md	3028 passed; 23 failed; 4 cancelled
+2026-10-26T13:02:00Z	design	Use explicit request access and stable account grants	One existing retry context covers requests while the shared manager owns quota and refresh	docs/team-architecture.md	Implemented
+2026-10-26T13:03:00Z	design	Keep legacy mode and opt into strict team boundaries	Existing individual clients retain their behavior	src/team-access.js	Implemented
+2026-10-26T13:04:00Z	design	Reject member blind tunnels and WebSocket relays	The initial team boundary supports pooled HTTP inference without exposing an unrestricted relay	src/mitm.js	Documented limitation
+2026-10-26T13:05:00Z	review	Record Grok design lane as unavailable	Its Linux sandbox refused an inaccessible container socket path; no provider substitution was made	docs/team-architecture.md	Native comparison plus independent Claude exploration
+2026-10-26T13:30:13Z	audit	Mark the initial milestone timestamps as approximate reconstructions	Initial entries were written after their events; subsequent entries use recording time	docs/team-decisions.tsv	Timestamp precision clarified; decisions unchanged
+2026-10-26T13:30:13Z	review	Fix cancellation, stable pins, namespace collisions, onboarding, and deny-all administration	Independent adversarial reproductions exposed concrete defects before publication	docs/team-review.md	Fixed and covered by committed regressions
+2026-10-26T13:30:13Z	verification	Run real TLS HTTP2 and container lifecycle checks	Bound listener unit tests alone did not prove transport or server reload behavior	test/team-mitm.test.js; test-helpers/team-container-smoke.mjs	Passed
+2026-10-26T13:30:13Z	verification	Make NXDOMAIN tests independent of external DNS	The complete suite exposed a resolver timeout that the standalone tests did not	test/unreachable-upstream.test.js	Fake DNS boundary; real HTTP failure handling
+2026-10-26T13:30:13Z	delivery	Disable automatic npm publishing and keep fork package identity separate	Publishing source does not imply ownership of the upstream npm package	package.json; .github/workflows/publish.yml	Manual npm release only

@@ -6,16 +6,18 @@ name: Docker
 # published to npm. Auth uses the built-in GITHUB_TOKEN. PRs build but never push.
 on:
   push:
-    branches: [master]
+    branches: [main]
     paths:
+      - 'src/**'
       - 'package.json'
       - 'Dockerfile'
       - 'docker-entrypoint.sh'
       - '.dockerignore'
       - '.github/workflows/docker.yml'
   pull_request:
-    branches: [master]
+    branches: [main]
     paths:
+      - 'src/**'
       - 'package.json'
       - 'Dockerfile'
       - 'docker-entrypoint.sh'

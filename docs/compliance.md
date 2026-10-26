@@ -1,5 +1,7 @@
 # Compliance and terms of service
 
+This page records the upstream maintainer's individual-use scope. This community fork adds technical team access controls documented in [team operations](teams.md). Its software license does not grant permission to share provider subscriptions. Administrators must use provider credentials and account arrangements authorized for their organization.
+
 > This is the maintainer's good-faith understanding, **not legal advice.** Each provider's terms are theirs to interpret and to change; read the current ones and decide for yourself.
 
 ## Who it is for

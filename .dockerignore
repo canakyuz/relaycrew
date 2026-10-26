@@ -30,3 +30,7 @@ README.md
 SECURITY.md
 Dockerfile
 .dockerignore
+
+data
+UPSTREAM.md
+compose.yaml
