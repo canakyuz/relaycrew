@@ -71,12 +71,12 @@ test('crashes append rather than overwrite', async () => {
 });
 
 test('the crash log sits next to the config', () => {
-  const prev = process.env.TEAMCLAUDE_CONFIG;
-  process.env.TEAMCLAUDE_CONFIG = '/tmp/somewhere/teamclaude.json';
+  const prev = process.env.RELAYCREW_CONFIG;
+  process.env.RELAYCREW_CONFIG = '/tmp/somewhere/relaycrew.json';
   try {
-    assert.equal(getCrashLogPath(), '/tmp/somewhere/teamclaude-crash.log');
+    assert.equal(getCrashLogPath(), '/tmp/somewhere/relaycrew-crash.log');
   } finally {
-    if (prev === undefined) delete process.env.TEAMCLAUDE_CONFIG;
-    else process.env.TEAMCLAUDE_CONFIG = prev;
+    if (prev === undefined) delete process.env.RELAYCREW_CONFIG;
+    else process.env.RELAYCREW_CONFIG = prev;
   }
 });

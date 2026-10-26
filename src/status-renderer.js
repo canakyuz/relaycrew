@@ -19,7 +19,7 @@ export function renderStatus(status, { color = process.stdout.isTTY, now = Date.
   // configured order (the sort is stable), which is also the rotation cursor's.
     const accounts = [...(status.accounts || [])].sort((a, b) => (a.priority || 0) - (b.priority || 0));
   const blocked = (status.blockedModels || []).filter(p => typeof p === 'string' && p.length).map(p => safeLine(p, 64));
-  // This payload can come off the wire (`teamclaude status` against a running
+  // This payload can come off the wire (`relaycrew status` against a running
   // server), and account/route strings in it started life in an OAuth reply or
   // a config file. Names are cut down once here and compared in that form, so a
   // stripped account still matches a stripped current-account marker.
@@ -29,7 +29,7 @@ export function renderStatus(status, { color = process.stdout.isTTY, now = Date.
   // the `>` marker follow the sessions; see formatActive for why the modes differ.
   const adaptiveMode = status.sessions?.mode === 'adaptive';
 
-  lines.push(paint.bold('TeamClaude status'));
+  lines.push(paint.bold('RelayCrew status'));
   lines.push(`${paint.dim(activeLabel(adaptiveMode).padEnd(12))} ${formatActive(status, currentAccount, adaptiveMode, paint)}`);
   lines.push(`${paint.dim('Switch at'.padEnd(12))} ${formatPercent(status.switchThreshold)}`);
   // Only when something is blocked: a always-visible "Blocked" row would be
@@ -314,7 +314,7 @@ export function forecastText(forecast, now) {
  * reading that is still there is drawn whatever the flag says: it may be the
  * one keeping the account out of rotation.
  *
- * One rule for `teamclaude status`, the TUI row and the dashboard card (#511).
+ * One rule for `relaycrew status`, the TUI row and the dashboard card (#511).
  * Closure-free: the dashboard serializes it into its page with toString().
  *
  * @param {{sessionWindowStated?: boolean, unified5h?: number|null}|null|undefined} quota
@@ -415,7 +415,7 @@ export function unavailableLine(account, paint) {
 
 // Compact names for the "switch NN%" line below — short enough that several
 // can sit on one line (`switch 7d 90%, fable 80%`), and the same short form
-// `teamclaude threshold <bucket>=<pct>` already uses on the command line.
+// `relaycrew threshold <bucket>=<pct>` already uses on the command line.
 /** @type {Object<string, string>} */
 const THRESHOLD_BUCKET_LABELS = {
   unified5h: '5h', unified7d: '7d', unified7dSonnet: 'sonnet', unified7dFable: 'fable',
@@ -630,7 +630,7 @@ function bucketLabel(key) {
 
 // A number in the adaptive readout, or `?` when the payload did not carry one:
 // an older server omits fields, a hostile one sends strings, and neither may
-// throw inside `teamclaude status`.
+// throw inside `relaycrew status`.
 function pct(value, digits) {
   return Number.isFinite(value) ? `${(value * 100).toFixed(digits)}%` : '?';
 }

@@ -311,7 +311,7 @@ export function isTokenExpired(expiresAt) {
   return Date.now() >= at;
 }
 
-/** Normalize the OAuth profile fields TeamClaude persists and exposes. */
+/** Normalize the OAuth profile fields RelayCrew persists and exposes. */
 export function normalizeProfile(data) {
   return {
     accountUuid: data.account?.uuid,
@@ -930,7 +930,7 @@ export async function startOAuthLogin({ loopback = true, routing = null, signal 
 }
 
 /**
- * `teamclaude login` on the machine with the browser: open it on the loopback
+ * `relaycrew login` on the machine with the browser: open it on the loopback
  * URL and wait for the redirect.
  *
  * On a terminal the code-page URL is printed as the fallback, and its code can
@@ -965,7 +965,7 @@ export async function loginOAuth({ routing = null, input = process.stdin } = {})
 }
 
 /**
- * `teamclaude login --token`, and `teamclaude login` on a remote session: the
+ * `relaycrew login --token`, and `relaycrew login` on a remote session: the
  * sign-in with no browser and no listener on this machine.
  *
  * The person opens the URL on any device, signs in, and pastes back the code

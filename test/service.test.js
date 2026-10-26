@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, readFile } from 'node:fs/promises';
+import { mkdtemp, rm, readFile, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -27,9 +27,9 @@ test('service kind follows the platform', () => {
 
 test('unit files land in the per-user locations', () => {
   assert.equal(launchAgentPath('/Users/x'), `/Users/x/Library/LaunchAgents/${LABEL}.plist`);
-  assert.equal(systemdUnitPath('/home/x', null), '/home/x/.config/systemd/user/teamclaude.service');
-  assert.equal(systemdUnitPath('/home/x', '/cfg'), '/cfg/systemd/user/teamclaude.service');
-  assert.equal(logPath('/Users/x', 'darwin'), '/Users/x/Library/Logs/teamclaude.log');
+  assert.equal(systemdUnitPath('/home/x', null), '/home/x/.config/systemd/user/relaycrew.service');
+  assert.equal(systemdUnitPath('/home/x', '/cfg'), '/cfg/systemd/user/relaycrew.service');
+  assert.equal(logPath('/Users/x', 'darwin'), '/Users/x/Library/Logs/relaycrew.log');
 });
 
 // The regression this guards: process.execPath on a Homebrew node points into
@@ -38,19 +38,19 @@ test('unit files land in the per-user locations', () => {
 test('resolveExec prefers a PATH symlink over the versioned real path', () => {
   const exec = resolveExec({
     execPath: '/opt/homebrew/Cellar/node/26.5.0_1/bin/node',
-    argv1: '/opt/homebrew/bin/teamclaude',
+    argv1: '/opt/homebrew/bin/relaycrew',
     pathEnv: '/usr/bin:/opt/homebrew/bin',
     exists: (p) => p === '/opt/homebrew/bin/node',
     realpath: (p) => (p === '/opt/homebrew/bin/node' ? '/opt/homebrew/Cellar/node/26.5.0_1/bin/node' : p),
   });
   assert.equal(exec.node, '/opt/homebrew/bin/node');
-  assert.equal(exec.entry, '/opt/homebrew/bin/teamclaude');
+  assert.equal(exec.entry, '/opt/homebrew/bin/relaycrew');
 });
 
 test('resolveExec keeps the real path when no PATH entry matches it', () => {
   const exec = resolveExec({
     execPath: '/usr/local/n/versions/node/24/bin/node',
-    argv1: '/usr/local/bin/teamclaude',
+    argv1: '/usr/local/bin/relaycrew',
     pathEnv: '/usr/bin',
     exists: () => false,
     realpath: (p) => p,
@@ -62,7 +62,7 @@ test('resolveExec keeps the real path when no PATH entry matches it', () => {
 test('resolveExec ignores a PATH node that is a different binary', () => {
   const exec = resolveExec({
     execPath: '/opt/homebrew/Cellar/node/26.5.0_1/bin/node',
-    argv1: '/x/teamclaude',
+    argv1: '/x/relaycrew',
     pathEnv: '/usr/bin',
     exists: () => true,
     realpath: (p) => (p === '/usr/bin/node' ? '/usr/bin/node-18' : p),
@@ -73,7 +73,7 @@ test('resolveExec ignores a PATH node that is a different binary', () => {
 // launchd starts with an empty environment — an inherited-looking PATH is not
 // inherited at all, so the unit has to carry one or self-update can't find npm.
 test('the service PATH covers both binaries and the system directories', () => {
-  const p = servicePath({ node: '/opt/homebrew/bin/node', entry: '/opt/homebrew/bin/teamclaude' });
+  const p = servicePath({ node: '/opt/homebrew/bin/node', entry: '/opt/homebrew/bin/relaycrew' });
   assert.match(p, /^\/opt\/homebrew\/bin:/);
   assert.match(p, /\/usr\/bin/);
   assert.equal(p.split(':').filter(d => d === '/opt/homebrew/bin').length, 1); // deduped
@@ -81,10 +81,10 @@ test('the service PATH covers both binaries and the system directories', () => {
 
 test('the LaunchAgent asks for restart-on-exit and headless mode', () => {
   const plist = renderLaunchAgent({
-    node: '/opt/homebrew/bin/node', entry: '/opt/homebrew/bin/teamclaude',
-    log: '/Users/x/Library/Logs/teamclaude.log', path: '/opt/homebrew/bin:/usr/bin',
+    node: '/opt/homebrew/bin/node', entry: '/opt/homebrew/bin/relaycrew',
+    log: '/Users/x/Library/Logs/relaycrew.log', path: '/opt/homebrew/bin:/usr/bin',
   });
-  assert.match(plist, /<key>Label<\/key>\s*<string>com\.karpeleslab\.teamclaude<\/string>/);
+  assert.match(plist, /<key>Label<\/key>\s*<string>com\.sep1ol\.relaycrew<\/string>/);
   assert.match(plist, /<string>server<\/string>\s*<string>--headless<\/string>/);
   assert.match(plist, /<key>KeepAlive<\/key>\s*<true\/>/);
   assert.match(plist, /<key>RunAtLoad<\/key>\s*<true\/>/);
@@ -97,31 +97,31 @@ test('the LaunchAgent asks for restart-on-exit and headless mode', () => {
 
 test('paths with XML metacharacters are escaped, not injected', () => {
   const plist = renderLaunchAgent({
-    node: '/n', entry: '/opt/a&b/<teamclaude>', log: '/l', path: '/p',
+    node: '/n', entry: '/opt/a&b/<relaycrew>', log: '/l', path: '/p',
   });
-  assert.match(plist, /&amp;b\/&lt;teamclaude&gt;/);
-  assert.ok(!plist.includes('/opt/a&b/<teamclaude>'));
+  assert.match(plist, /&amp;b\/&lt;relaycrew&gt;/);
+  assert.ok(!plist.includes('/opt/a&b/<relaycrew>'));
 });
 
 test('the systemd unit restarts and starts at login', () => {
   const unit = renderSystemdUnit({
-    node: '/usr/bin/node', entry: '/usr/bin/teamclaude', path: '/usr/bin',
+    node: '/usr/bin/node', entry: '/usr/bin/relaycrew', path: '/usr/bin',
   });
-  assert.match(unit, /ExecStart="\/usr\/bin\/node" "\/usr\/bin\/teamclaude" server --headless/);
+  assert.match(unit, /ExecStart="\/usr\/bin\/node" "\/usr\/bin\/relaycrew" server --headless/);
   assert.match(unit, /Restart=always/);
   assert.match(unit, /WantedBy=default\.target/);
   assert.match(unit, /Environment="PATH=\/usr\/bin"/);
 });
 
 test('an optional config path is carried into both unit formats', () => {
-  const opts = { node: '/n', entry: '/e', log: '/l', path: '/p', configPath: '/cfg/teamclaude.json' };
-  assert.match(renderLaunchAgent(opts), /TEAMCLAUDE_CONFIG<\/key>\s*<string>\/cfg\/teamclaude\.json/);
-  assert.match(renderSystemdUnit(opts), /Environment="TEAMCLAUDE_CONFIG=\/cfg\/teamclaude\.json"/);
+  const opts = { node: '/n', entry: '/e', log: '/l', path: '/p', configPath: '/cfg/relaycrew.json' };
+  assert.match(renderLaunchAgent(opts), /RELAYCREW_CONFIG<\/key>\s*<string>\/cfg\/relaycrew\.json/);
+  assert.match(renderSystemdUnit(opts), /Environment="RELAYCREW_CONFIG=\/cfg\/relaycrew\.json"/);
 });
 
 // Unquoted, a path with a space is two words to systemd — ExecStart would run
 // the wrong program — and a newline anywhere starts a new line of the unit, so
-// a TEAMCLAUDE_CONFIG carrying "\n" injected [Service] directives of its own.
+// a RELAYCREW_CONFIG carrying "\n" injected [Service] directives of its own.
 test('systemd unit values are quoted systemd-style: spaces kept, backslash and quote escaped', () => {
   assert.equal(systemdQuote('/opt/my tools/node'), '"/opt/my tools/node"');
   assert.equal(systemdQuote('/o"p\\t'), '"/o\\"p\\\\t"');
@@ -131,7 +131,7 @@ test('systemd unit values are quoted systemd-style: spaces kept, backslash and q
   });
   assert.match(unit, /^ExecStart="\/opt\/my tools\/node" "\/home\/o\\"brien\/tc" server --headless$/m);
   assert.match(unit, /^Environment="PATH=\/opt\/my tools:\/usr\/bin"$/m);
-  assert.match(unit, /^Environment="TEAMCLAUDE_CONFIG=\/home\/o\\"brien\/cfg.json"$/m);
+  assert.match(unit, /^Environment="RELAYCREW_CONFIG=\/home\/o\\"brien\/cfg.json"$/m);
 });
 
 test('a control character in any unit path is refused, not written', () => {
@@ -152,13 +152,13 @@ test('installing on launchd writes the plist and loads it', async () => {
     const { run, calls } = recorder();
     const res = await installService({
       kind: 'launchd', home, platform: 'darwin', run, log: () => {},
-      exec: { node: '/opt/homebrew/bin/node', entry: '/opt/homebrew/bin/teamclaude' },
+      exec: { node: '/opt/homebrew/bin/node', entry: '/opt/homebrew/bin/relaycrew' },
     });
     assert.equal(res.ok, true);
     const written = await readFile(launchAgentPath(home), 'utf8');
-    assert.match(written, /teamclaude/);
+    assert.match(written, /relaycrew/);
     // bootout before bootstrap: bootstrap fails outright if the label is loaded.
-    assert.match(calls[0], /^launchctl bootout gui\/\d+\/com\.karpeleslab\.teamclaude$/);
+    assert.match(calls[0], /^launchctl bootout gui\/\d+\/com\.sep1ol\.relaycrew$/);
     assert.match(calls[1], /^launchctl bootstrap gui\/\d+ /);
   } finally {
     await rm(home, { recursive: true, force: true });
@@ -195,14 +195,14 @@ test('installing on systemd reloads the daemon, enables the unit and restarts it
     // while asserting against a temp path that was never written.
     const res = await installService({
       kind: 'systemd', home, platform: 'linux', run, log: () => {}, xdgConfig: null,
-      exec: { node: '/usr/bin/node', entry: '/usr/bin/teamclaude' },
+      exec: { node: '/usr/bin/node', entry: '/usr/bin/relaycrew' },
     });
     assert.equal(res.ok, true);
     assert.match(await readFile(systemdUnitPath(home, null), 'utf8'), /ExecStart=/);
     assert.deepEqual(calls, [
       'systemctl --user daemon-reload',
-      'systemctl --user enable teamclaude.service',
-      'systemctl --user restart teamclaude.service',
+      'systemctl --user enable relaycrew.service',
+      'systemctl --user restart relaycrew.service',
     ]);
   } finally {
     await rm(home, { recursive: true, force: true });
@@ -212,13 +212,13 @@ test('installing on systemd reloads the daemon, enables the unit and restarts it
 test('a failed systemd restart is reported as a failure, not a silent success', async () => {
   const home = await mkdtemp(join(tmpdir(), 'tc-svc-'));
   try {
-    const { run } = recorder({ restart: { code: 1, stdout: '', stderr: 'Job for teamclaude.service failed.' } });
+    const { run } = recorder({ restart: { code: 1, stdout: '', stderr: 'Job for relaycrew.service failed.' } });
     const res = await installService({
       kind: 'systemd', home, platform: 'linux', run, log: () => {}, xdgConfig: null,
-      exec: { node: '/usr/bin/node', entry: '/usr/bin/teamclaude' },
+      exec: { node: '/usr/bin/node', entry: '/usr/bin/relaycrew' },
     });
     assert.equal(res.ok, false);
-    assert.match(res.error, /Job for teamclaude\.service failed/);
+    assert.match(res.error, /Job for relaycrew\.service failed/);
   } finally {
     await rm(home, { recursive: true, force: true });
   }
@@ -234,10 +234,10 @@ test('the systemd unit follows XDG_CONFIG_HOME when one is set', async () => {
     const { run } = recorder();
     const res = await installService({
       kind: 'systemd', home, platform: 'linux', run, log: () => {}, xdgConfig: xdg,
-      exec: { node: '/usr/bin/node', entry: '/usr/bin/teamclaude' },
+      exec: { node: '/usr/bin/node', entry: '/usr/bin/relaycrew' },
     });
     assert.equal(res.ok, true);
-    assert.equal(res.file, join(xdg, 'systemd', 'user', 'teamclaude.service'));
+    assert.equal(res.file, join(xdg, 'systemd', 'user', 'relaycrew.service'));
     assert.match(await readFile(res.file, 'utf8'), /ExecStart=/);
   } finally {
     await rm(home, { recursive: true, force: true });
@@ -286,4 +286,22 @@ test('an unsupported platform refuses instead of writing anything', async () => 
   const res = await installService({ kind: null, platform: 'win32', log: () => {} });
   assert.equal(res.ok, false);
   assert.match(res.error, /win32/);
+});
+
+
+test('installing RelayCrew retires an unloaded legacy LaunchAgent', async t => {
+  const home = await mkdtemp(join(tmpdir(), 'relaycrew-legacy-service-'));
+  t.after(() => rm(home, { recursive: true, force: true }));
+  const old = join(home, 'Library', 'LaunchAgents', 'com.karpeleslab.teamclaude.plist');
+  await mkdir(join(home, 'Library', 'LaunchAgents'), { recursive: true });
+  await writeFile(old, '<plist/>');
+  const calls = [];
+  const run = (cmd, args) => {
+    calls.push([cmd, ...args]);
+    return { code: args.includes('bootout') ? 113 : 0, stdout: '', stderr: '' };
+  };
+  const result = await installService({ kind: 'launchd', home, platform: 'darwin', exec: { node: '/usr/bin/node', entry: '/opt/relaycrew' }, run, log: () => {} });
+  assert.equal(result.ok, true);
+  await assert.rejects(readFile(old), { code: 'ENOENT' });
+  assert(calls.some(call => call.includes('bootstrap')));
 });

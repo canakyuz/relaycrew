@@ -11,12 +11,12 @@ import { providerOf } from './provider.js';
 
 const MEMBER_NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;
 const USAGE = [
-  'Usage: teamclaude team init',
-  '       teamclaude team accounts',
-  '       teamclaude team add <name> --accounts <id,id|*> [--max-concurrent N]',
-  '       teamclaude team list',
-  '       teamclaude team revoke <name>',
-  '       teamclaude team rotate <name>',
+  'Usage: relaycrew team init',
+  '       relaycrew team accounts',
+  '       relaycrew team add <name> --accounts <id,id|*> [--max-concurrent N]',
+  '       relaycrew team list',
+  '       relaycrew team revoke <name>',
+  '       relaycrew team rotate <name>',
   '',
   'Use stable IDs from team accounts. Quote "*" to explicitly grant every account.',
 ].join('\n');
@@ -120,7 +120,7 @@ async function notifyRunningServer(config) {
     return;
   }
   try {
-    const response = await fetch(`http://127.0.0.1:${port}/teamclaude/reload`, {
+    const response = await fetch(`http://127.0.0.1:${port}/relaycrew/reload`, {
       method: 'POST',
       headers: { 'x-api-key': config.proxy.apiKey },
       signal: AbortSignal.timeout(1500),

@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 
 test('authorization is checked after the upstream admission queue', async t => {
-  const previous = process.env.TEAMCLAUDE_UPSTREAM_MAX_SOCKETS;
-  process.env.TEAMCLAUDE_UPSTREAM_MAX_SOCKETS = '1';
+  const previous = process.env.RELAYCREW_UPSTREAM_MAX_SOCKETS;
+  process.env.RELAYCREW_UPSTREAM_MAX_SOCKETS = '1';
   let pool;
   try {
     pool = await import('../src/upstream-fetch.js?team-admission');
   } finally {
-    if (previous === undefined) delete process.env.TEAMCLAUDE_UPSTREAM_MAX_SOCKETS;
-    else process.env.TEAMCLAUDE_UPSTREAM_MAX_SOCKETS = previous;
+    if (previous === undefined) delete process.env.RELAYCREW_UPSTREAM_MAX_SOCKETS;
+    else process.env.RELAYCREW_UPSTREAM_MAX_SOCKETS = previous;
   }
   let activeResponse;
   let requests = 0;

@@ -16,12 +16,12 @@ async function withConfig(raw, fn) {
   const dir = await mkdtemp(join(tmpdir(), 'tc-config-'));
   const path = join(dir, 'config.json');
   await writeFile(path, JSON.stringify(raw));
-  const prev = process.env.TEAMCLAUDE_CONFIG;
-  process.env.TEAMCLAUDE_CONFIG = path;
+  const prev = process.env.RELAYCREW_CONFIG;
+  process.env.RELAYCREW_CONFIG = path;
   try {
     await fn(path);
   } finally {
-    if (prev === undefined) delete process.env.TEAMCLAUDE_CONFIG; else process.env.TEAMCLAUDE_CONFIG = prev;
+    if (prev === undefined) delete process.env.RELAYCREW_CONFIG; else process.env.RELAYCREW_CONFIG = prev;
   }
 }
 
@@ -29,7 +29,7 @@ const idsOn = async (/** @type {string} */ path) => JSON.parse(await readFile(pa
 
 test('a row added through atomicConfigUpdate is written with an id, and every read sees that id', async () => {
   await withConfig({ accounts: [{ id: 'first', name: 'a', type: 'apikey', apiKey: 'k1' }] }, async (path) => {
-    // What `teamclaude login` does: push a new entry built without an id.
+    // What `relaycrew login` does: push a new entry built without an id.
     await atomicConfigUpdate(c => { c.accounts.push({ name: 'b', type: 'apikey', apiKey: 'k2' }); });
     const [first, added] = await idsOn(path);
     assert.equal(first, 'first', 'an existing id is kept');
@@ -59,12 +59,12 @@ test('loadConfigPersistingIds leaves a file that already carries every id byte f
 
 test('loadConfigPersistingIds answers null when there is no file', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'tc-config-'));
-  const prev = process.env.TEAMCLAUDE_CONFIG;
-  process.env.TEAMCLAUDE_CONFIG = join(dir, 'absent.json');
+  const prev = process.env.RELAYCREW_CONFIG;
+  process.env.RELAYCREW_CONFIG = join(dir, 'absent.json');
   try {
     assert.equal(await loadConfigPersistingIds(), null);
   } finally {
-    if (prev === undefined) delete process.env.TEAMCLAUDE_CONFIG; else process.env.TEAMCLAUDE_CONFIG = prev;
+    if (prev === undefined) delete process.env.RELAYCREW_CONFIG; else process.env.RELAYCREW_CONFIG = prev;
   }
 });
 
@@ -85,7 +85,7 @@ test('a row added while the server runs has its id on disk after the reload that
     const edited = JSON.parse(await readFile(configPath, 'utf8'));
     edited.accounts.push({ name: 'b', type: 'apikey', apiKey: 'k2' });
     await writeFile(configPath, JSON.stringify(edited));
-    const res = await fetch(`http://127.0.0.1:${port}/teamclaude/reload`, { method: 'POST' });
+    const res = await fetch(`http://127.0.0.1:${port}/relaycrew/reload`, { method: 'POST' });
     const body = await res.json();
     assert.equal(res.status, 200, JSON.stringify(body));
     assert.equal(body.added, 1, 'the reload picked the row up');
@@ -93,7 +93,7 @@ test('a row added while the server runs has its id on disk after the reload that
     const ids = await idsOn(configPath);
     assert.ok(typeof ids[1] === 'string' && ids[1].length > 0, `the picked-up row carries an id on disk: ${JSON.stringify(ids)}`);
     // A second reload must not mint again: the row's id is settled.
-    const again = await fetch(`http://127.0.0.1:${port}/teamclaude/reload`, { method: 'POST' });
+    const again = await fetch(`http://127.0.0.1:${port}/relaycrew/reload`, { method: 'POST' });
     assert.equal(again.status, 200);
     assert.deepEqual(await idsOn(configPath), ids);
   } finally {

@@ -375,7 +375,7 @@ export async function startCodexLogin({ routing = null, signal = null, timeoutMs
 }
 
 /**
- * `teamclaude login --codex`: a browser sign-in against OpenAI from the CLI.
+ * `relaycrew login --codex`: a browser sign-in against OpenAI from the CLI.
  *
  * The browser is opened unless `noBrowser` says not to (the flag, or a remote
  * session). On a terminal the address the browser lands on can be pasted as

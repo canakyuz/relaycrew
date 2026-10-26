@@ -148,7 +148,7 @@ export function thresholdTable(value) {
   // nothing ever asks about, while the threshold in force stayed the default
   // and nothing said why (#425).
   if (Array.isArray(value)) {
-    console.error('[TeamClaude] switchThreshold is an array in the config — expected a number or an object keyed by bucket; using the default');
+    console.error('[RelayCrew] switchThreshold is an array in the config — expected a number or an object keyed by bucket; using the default');
     return { default: DEFAULT_SWITCH_THRESHOLD };
   }
   if (value && typeof value === 'object') {
@@ -332,7 +332,7 @@ export function setDefaultClientMode(config, mode) {
 
 // ── account controls ─────────────────────────────────────────────────────────
 //
-// `teamclaude priority` / `disable` / `enable` resolved and mutated the account
+// `relaycrew priority` / `disable` / `enable` resolved and mutated the account
 // inline, which left the same three steps — match, disambiguate, mutate — with
 // no home a non-CLI caller could reach. These are that, as operations, so the
 // CLI, the MCP tools and the dashboard all decide "which account" the same way.

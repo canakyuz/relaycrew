@@ -66,7 +66,7 @@ If you change the Nix package or module, run the Nix checks when Nix is availabl
 
 ```sh
 nix flake check --no-update-lock-file -L
-nix run --no-update-lock-file .#teamclaude -- help
+nix run --no-update-lock-file .#relaycrew -- help
 ```
 
 State any check you could not run and why. GitHub Actions runs the Node.js matrix and Nix checks on pull requests. The aggregate `test` check must pass before merge, including for documentation changes.

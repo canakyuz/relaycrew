@@ -2,13 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { writeFile, readFile } from 'node:fs/promises';
-import { spawnServer, closedPort } from '../test-helpers/spawn-server.js';
+import { spawnServer } from '../test-helpers/spawn-server.js';
 
-// Live reload (POST /teamclaude/reload → syncAccountsFromDisk) must pick up a
+// Live reload (POST /relaycrew/reload → syncAccountsFromDisk) must pick up a
 // per-account `upstream`/`modelMap` edit, the same way it already picks up
 // credential, priority and enable/disable changes — server.js reads both fields
 // off the manager's account object per request. These drive the real server as
-// a subprocess against a throwaway TEAMCLAUDE_CONFIG; the stub upstream is the
+// a subprocess against a throwaway RELAYCREW_CONFIG; the stub upstream is the
 // witness: it can only receive the request (with the mapped model) if the
 // reload actually carried the fields onto the running account.
 
@@ -29,14 +29,15 @@ function startStubUpstream(hits) {
   });
 }
 
-// Server harness: global upstream points at a dead port, so a request only
+// Server harness: global upstream returns an explicit 503, so a request only
 // reaches the stub while the ACCOUNT's upstream override is in force — no
 // accidental pass via the fleet default.
 async function withServer(fn) {
   const hits = [];
   const stub = startStubUpstream(hits);
   const stubPort = await listen(stub);
-  const deadPort = await closedPort();
+  const unavailable = http.createServer((_req, res) => { res.writeHead(503); res.end('{}'); });
+  const deadPort = await listen(unavailable);
 
   const server = await spawnServer({
     config: () => ({
@@ -52,15 +53,17 @@ async function withServer(fn) {
   } finally {
     await server.stop();
     stub.close();
+    unavailable.closeAllConnections?.();
+    unavailable.close();
   }
 }
 
 async function reload(proxyPort) {
-  const res = await fetch(`http://127.0.0.1:${proxyPort}/teamclaude/reload`, { method: 'POST' });
+  const res = await fetch(`http://127.0.0.1:${proxyPort}/relaycrew/reload`, { method: 'POST' });
   assert.equal(res.status, 200, await res.text());
 }
 
-// Fire one chat request at the proxy; a destroyed connection (dead upstream)
+// Fire one chat request at the proxy; a destroyed connection (unavailable upstream)
 // reads as null — the stub's hit list is the verdict either way.
 async function sendMessage(proxyPort, model) {
   try {

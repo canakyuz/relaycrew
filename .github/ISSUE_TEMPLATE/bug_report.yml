@@ -11,9 +11,9 @@ body:
     id: versions
     attributes:
       label: Versions and environment
-      description: Include the TeamClaude version or commit, Node.js version, operating system, and relevant client and provider names. Do not include account details.
+      description: Include the RelayCrew version or commit, Node.js version, operating system, and relevant client and provider names. Do not include account details.
       placeholder: |
-        TeamClaude commit or version:
+        RelayCrew commit or version:
         Node.js version:
         Operating system:
         Client and version:

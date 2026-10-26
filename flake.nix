@@ -1,5 +1,5 @@
 {
-  description = "TeamClaude packaged as a dependency-free Node application";
+  description = "RelayCrew packaged as a dependency-free Node application";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
@@ -26,11 +26,13 @@
         system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
-          teamclaude = pkgs.callPackage ./nix/package.nix { };
+          relaycrew = pkgs.callPackage ./nix/package.nix { };
         in
         {
-          inherit teamclaude;
-          default = teamclaude;
+          inherit relaycrew;
+          teamclaude = relaycrew;
+          teamrouter = relaycrew;
+          default = relaycrew;
         }
       );
 
@@ -41,7 +43,7 @@
         in
         {
           # `nix flake check` builds the package on every system.
-          package = self.packages.${system}.teamclaude;
+          package = self.packages.${system}.relaycrew;
         }
         # The NixOS VM test only runs on Linux (nixosTest requires a Linux host).
         // nixpkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
@@ -50,24 +52,28 @@
       );
 
       apps = forAllSystems (system: {
-        teamclaude = {
+        relaycrew = {
           type = "app";
-          program = "${self.packages.${system}.teamclaude}/bin/teamclaude";
+          program = "${self.packages.${system}.relaycrew}/bin/relaycrew";
           meta = {
-            inherit (self.packages.${system}.teamclaude.meta) description;
+            inherit (self.packages.${system}.relaycrew.meta) description;
           };
         };
-        default = self.apps.${system}.teamclaude;
+        teamclaude = self.apps.${system}.relaycrew;
+        teamrouter = self.apps.${system}.relaycrew;
+        default = self.apps.${system}.relaycrew;
       });
 
       nixosModules = {
-        teamclaude = import ./nix/module.nix;
-        default = self.nixosModules.teamclaude;
+        relaycrew = import ./nix/module.nix;
+        teamclaude = self.nixosModules.relaycrew;
+        default = self.nixosModules.relaycrew;
       };
 
       homeManagerModules = {
-        teamclaude = import ./nix/home-manager-module.nix;
-        default = self.homeManagerModules.teamclaude;
+        relaycrew = import ./nix/home-manager-module.nix;
+        teamclaude = self.homeManagerModules.relaycrew;
+        default = self.homeManagerModules.relaycrew;
       };
     };
 }

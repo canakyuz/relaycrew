@@ -32,7 +32,7 @@ function teamConfig() {
 }
 
 async function fixture(t, config = baseConfig()) {
-  const dir = await mkdtemp(join(tmpdir(), 'teamclaude-team-'));
+  const dir = await mkdtemp(join(tmpdir(), 'relaycrew-team-'));
   t.after(() => rm(dir, { recursive: true, force: true }));
   const path = join(dir, 'config.json');
   await writeFile(path, JSON.stringify(config));
@@ -41,7 +41,7 @@ async function fixture(t, config = baseConfig()) {
 
 function runCli(configPath, args) {
   const child = spawn(process.execPath, [cliPath, 'team', ...args], {
-    env: { ...process.env, TEAMCLAUDE_CONFIG: configPath, TEAMCLAUDE_DISABLE_AUTOUPDATE: '1' },
+    env: { ...process.env, RELAYCREW_CONFIG: configPath, RELAYCREW_DISABLE_AUTOUPDATE: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let stdout = '';
@@ -285,7 +285,7 @@ test('team changes notify only the local reload endpoint with the admin key and 
   const result = await runCli(file.path, ['add', 'bob', '--accounts', 'account-b']);
   assert.equal(result.code, 0, result.stderr);
   assert.match(result.stdout, /Reloaded running server/);
-  assert.deepEqual(requests, [{ method: 'POST', path: '/teamclaude/reload', key: ADMIN_KEY, body: '' }]);
+  assert.deepEqual(requests, [{ method: 'POST', path: '/relaycrew/reload', key: ADMIN_KEY, body: '' }]);
   assert.ok(!(result.stdout + result.stderr).includes(ADMIN_KEY));
 });
 
@@ -319,7 +319,7 @@ test('reload does not follow a redirect carrying the admin key', async t => {
   const file = await fixture(t, config);
   const result = await runCli(file.path, ['revoke', 'alice']);
   assert.equal(result.code, 0, result.stderr);
-  assert.deepEqual(paths, ['/teamclaude/reload']);
+  assert.deepEqual(paths, ['/relaycrew/reload']);
   assert.match(result.stderr, /Changes saved, but.*reload failed/);
   assert.equal((await file.read()).proxy.clientKeys[0].disabled, true);
 });

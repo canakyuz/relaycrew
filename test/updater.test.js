@@ -32,8 +32,8 @@ test('installKind detects a git checkout by a .git dir', async () => {
 
 test('installKind flags a global npm install and distinguishes a local one', async () => {
   const gRoot = '/usr/lib/node_modules';
-  const global = `${gRoot}/@sep1ol/teamclaude`;
-  const local = '/home/x/project/node_modules/@sep1ol/teamclaude';
+  const global = `${gRoot}/@sep1ol/relaycrew`;
+  const local = '/home/x/project/node_modules/@sep1ol/relaycrew';
   assert.equal(await installKind({ root: global, globalRoot: () => gRoot }), 'global');
   assert.equal(await installKind({ root: local, globalRoot: () => gRoot }), 'local');
   // `npm root -g` is asked asynchronously now, so a probe that answers later is
@@ -42,25 +42,25 @@ test('installKind flags a global npm install and distinguishes a local one', asy
 });
 
 test('installKind is unknown outside node_modules (e.g. running from source path)', async () => {
-  assert.equal(await installKind({ root: '/opt/teamclaude-src', globalRoot: () => null }), 'unknown');
+  assert.equal(await installKind({ root: '/opt/relaycrew-src', globalRoot: () => null }), 'unknown');
 });
 
 // A pnpm global install runs from pnpm's `.pnpm` store (the package root is the
 // real path, and pnpm links the package out of that store). It used to read as
-// 'local', so the daily notice said "Run: teamclaude update" and that command
+// 'local', so the daily notice said "Run: relaycrew update" and that command
 // ran `npm install -g`: a second copy in npm's global directory, reported as
 // "Updated", while the copy on PATH stayed on the old version.
 test('installKind recognizes a copy pnpm manages, without asking npm', async () => {
-  const root = '/home/x/.local/share/pnpm/global/v11/1b74-18deaff495f572c0-0/node_modules/.pnpm/@sep1ol+teamclaude@1.1.25/node_modules/@sep1ol/teamclaude';
+  const root = '/home/x/.local/share/pnpm/global/v11/1b74-18deaff495f572c0-0/node_modules/.pnpm/@sep1ol+relaycrew@1.1.25/node_modules/@sep1ol/relaycrew';
   let asked = 0;
   assert.equal(await installKind({ root, globalRoot: () => { asked++; return '/usr/lib/node_modules'; } }), 'pnpm');
   assert.equal(asked, 0);
 });
 
-test('updateCommandFor names pnpm for a pnpm copy and teamclaude update otherwise', () => {
+test('updateCommandFor names pnpm for a pnpm copy and relaycrew update otherwise', () => {
   assert.equal(updateCommandFor('pnpm'), `pnpm add -g ${PKG_NAME}@latest`);
-  assert.equal(updateCommandFor('global'), 'teamclaude update');
-  assert.equal(updateCommandFor('local'), 'teamclaude update');
+  assert.equal(updateCommandFor('global'), 'relaycrew update');
+  assert.equal(updateCommandFor('local'), 'relaycrew update');
 });
 
 // ── fetchLatestVersion ───────────────────────────────────────
@@ -239,11 +239,11 @@ test('autoUpdate points a pnpm copy at pnpm and installs nothing', async () => {
     assert.equal(res.notified, true);
     assert.equal(installed, 0);
     assert.equal(logs.length, 1);
-    assert.match(logs[0], /Update available: 1\.0\.0 → 2\.0\.0\. Run: pnpm add -g @sep1ol\/teamclaude@latest$/);
+    assert.match(logs[0], /Update available: 1\.0\.0 → 2\.0\.0\. Run: pnpm add -g @sep1ol\/relaycrew@latest$/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-// `sudo teamclaude server` would otherwise run `npm install -g` as root every
+// `sudo relaycrew server` would otherwise run `npm install -g` as root every
 // day, off a version string fetched from the network.
 test('autoUpdate never runs as root, and says so once', async () => {
   const root = nonGitRoot();

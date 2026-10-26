@@ -21,11 +21,11 @@ test('remote session: Linux with no display server is remote, with one it is not
 
 test('remote session: the override wins over what the environment shows, in either spelling', () => {
   // A server a service started inside tmux, attached over SSH later.
-  assert.equal(isRemoteSession({ TEAMCLAUDE_REMOTE: '1' }, 'darwin'), true);
-  assert.equal(isRemoteSession({ TEAMROUTER_REMOTE: '0', SSH_CONNECTION: '10.0.0.2 51000 10.0.0.1 22' }, 'linux'), false);
+  assert.equal(isRemoteSession({ RELAYCREW_REMOTE: '1' }, 'darwin'), true);
+  assert.equal(isRemoteSession({ RELAYCREW_REMOTE: '0', SSH_CONNECTION: '10.0.0.2 51000 10.0.0.1 22' }, 'linux'), false);
   // Anything else leaves it to the environment.
-  assert.equal(isRemoteSession({ TEAMCLAUDE_REMOTE: '', SSH_TTY: '/dev/pts/3' }, 'darwin'), true);
-  assert.equal(isRemoteSession({ TEAMCLAUDE_REMOTE: 'yes' }, 'darwin'), false);
+  assert.equal(isRemoteSession({ RELAYCREW_REMOTE: '', SSH_TTY: '/dev/pts/3' }, 'darwin'), true);
+  assert.equal(isRemoteSession({ RELAYCREW_REMOTE: 'yes' }, 'darwin'), false);
 });
 
 test('remote session: macOS and Windows without SSH are local, display or not', () => {

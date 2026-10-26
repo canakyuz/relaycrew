@@ -6,7 +6,7 @@
 //   - a local dependency / npx copy is left alone (we only notify).
 // Checks hit the npm registry at most once a day (cached in a small file next to
 // the config), so the overwhelmingly common invocation does zero network I/O.
-// Disable entirely with TEAMCLAUDE_DISABLE_AUTOUPDATE=1 or config.autoUpdate=false.
+// Disable entirely with RELAYCREW_DISABLE_AUTOUPDATE=1 or config.autoUpdate=false.
 //
 // Every side-effecting dependency (fetch, spawn, the clock, the cache path) is
 // injectable so the logic is unit-testable without network or npm.
@@ -50,7 +50,7 @@ export function currentVersion(root = packageRoot()) {
  * version, else the literal `local`. `git` reports a checkout — npm cannot
  * update one, so nothing should offer to.
  *
- * The git calls are pinned to the package root. `teamclaude server` is started
+ * The git calls are pinned to the package root. `relaycrew server` is started
  * from the operator's own project directory, and resolving against the process
  * cwd would report that repository's sha as this package's version.
  *
@@ -115,7 +115,7 @@ export async function installKind({ root = packageRoot(), globalRoot = npmGlobal
   if (!norm.includes('/node_modules/')) return 'unknown';
   // pnpm links a package out of its `.pnpm` store, and the package root is the
   // real path, so it runs through that store. Such a copy used to read as
-  // 'local': the notice said "Run: teamclaude update", and that ran `npm
+  // 'local': the notice said "Run: relaycrew update", and that ran `npm
   // install -g`, which put a second copy in npm's global directory and said
   // "Updated" while the copy on PATH stayed as it was.
   if (norm.includes('/node_modules/.pnpm/')) return 'pnpm';
@@ -126,11 +126,11 @@ export async function installKind({ root = packageRoot(), globalRoot = npmGlobal
 
 /**
  * The command that updates a copy installed as `kind` in place: pnpm's own for
- * a pnpm copy, `teamclaude update` (which runs npm) for anything else.
+ * a pnpm copy, `relaycrew update` (which runs npm) for anything else.
  * @param {string} kind
  */
 export function updateCommandFor(kind) {
-  return kind === 'pnpm' ? `pnpm add -g ${PKG_NAME}@latest` : 'teamclaude update';
+  return kind === 'pnpm' ? `pnpm add -g ${PKG_NAME}@latest` : 'relaycrew update';
 }
 
 /** Fetch the registry's current "latest" version (null on any failure/timeout). */
@@ -153,7 +153,7 @@ export async function fetchLatestVersion({ fetchImpl = fetch, timeoutMs = 5000 }
 }
 
 function defaultCacheFile() {
-  return join(dirname(getConfigPath()), 'update-check.json');
+  return join(dirname(getConfigPath()), 'relaycrew-update-check.json');
 }
 /**
  * @param {string} path
@@ -233,8 +233,8 @@ export function isReleaseVersion(v) {
  * The install is a child process the event loop keeps running beside, never a
  * synchronous wait. `autoUpdate` runs this inside `server --headless`, the one
  * process every client depends on: a synchronous `npm install -g` blocked it
- * for the whole install, so the proxy accepted no connections, `teamclaude
- * status` timed out and `teamclaude run` refused to launch — unattended, on
+ * for the whole install, so the proxy accepted no connections, `relaycrew
+ * status` timed out and `relaycrew run` refused to launch — unattended, on
  * whichever day the daily check found a new version (#353). The result only
  * matters for the log line, and the new version applies on the next start
  * regardless, so nothing is gained by waiting inline.
@@ -269,9 +269,9 @@ let rootWarned = false;
  * common case: the expensive `npm root -g` probe only runs when an update is
  * actually available.
  *
- * Never runs as root. `sudo teamclaude server` would otherwise run
+ * Never runs as root. `sudo relaycrew server` would otherwise run
  * `npm install -g` as root on a daily schedule, off a version string fetched
- * from the network — the operator can run `teamclaude update` deliberately.
+ * from the network — the operator can run `relaycrew update` deliberately.
  *
  * `root`, `uid`, `check`, `kind` and `install` are injectable for tests.
  *
@@ -297,7 +297,7 @@ export async function autoUpdate({
   if (uid === 0) {
     if (!rootWarned) {
       rootWarned = true;
-      log('[TeamClaude] Auto-update is disabled when running as root. Update deliberately with: teamclaude update');
+      log('[RelayCrew] Auto-update is disabled when running as root. Update deliberately with: relaycrew update');
     }
     return { skipped: 'root' };
   }
@@ -305,19 +305,19 @@ export async function autoUpdate({
   if (!info) return { skipped: 'check-failed' };
   if (!info.updateAvailable) return { ...info, upToDate: true };
   if (!isReleaseVersion(info.latest)) {
-    log(`[TeamClaude] Ignoring registry "latest" that is not a release version: ${JSON.stringify(String(info.latest)).slice(0, 80)}`);
+    log(`[RelayCrew] Ignoring registry "latest" that is not a release version: ${JSON.stringify(String(info.latest)).slice(0, 80)}`);
     return { ...info, skipped: 'bad-version' };
   }
 
   const how = await kind({ root });
   if (how !== 'global') {
-    log(`[TeamClaude] Update available: ${info.current} → ${info.latest}. Run: ${updateCommandFor(how)}`);
+    log(`[RelayCrew] Update available: ${info.current} → ${info.latest}. Run: ${updateCommandFor(how)}`);
     return { ...info, notified: true };
   }
-  log(`[TeamClaude] Updating ${info.current} → ${info.latest}…`);
+  log(`[RelayCrew] Updating ${info.current} → ${info.latest}…`);
   const ok = await install(info.latest);
   log(ok
-    ? `[TeamClaude] Updated to ${info.latest}. Restart teamclaude to use the new version.`
-    : `[TeamClaude] Auto-update failed. Run manually: npm install -g ${PKG_NAME}@latest`);
+    ? `[RelayCrew] Updated to ${info.latest}. Restart relaycrew to use the new version.`
+    : `[RelayCrew] Auto-update failed. Run manually: npm install -g ${PKG_NAME}@latest`);
   return { ...info, updated: ok };
 }

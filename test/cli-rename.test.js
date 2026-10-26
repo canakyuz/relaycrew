@@ -6,8 +6,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// `teamclaude rename` driven as a subprocess against a throwaway
-// TEAMCLAUDE_CONFIG, so the user's real config is never touched. The port here
+// `relaycrew rename` driven as a subprocess against a throwaway
+// RELAYCREW_CONFIG, so the user's real config is never touched. The port here
 // is one nothing listens on: the command notifies a running server after a
 // write, and that notification has to be a no-op for the test to be about the
 // config file.
@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 const cliPath = fileURLToPath(new URL('../src/index.js', import.meta.url));
 
 async function writeConfig() {
-  const dir = await mkdtemp(join(tmpdir(), 'teamclaude-rename-'));
+  const dir = await mkdtemp(join(tmpdir(), 'relaycrew-rename-'));
   const path = join(dir, 'config.json');
   await writeFile(path, JSON.stringify({
     proxy: { port: 3, apiKey: 'tc-test' },
@@ -32,7 +32,7 @@ async function writeConfig() {
 
 function runCli(configPath, cliArgs) {
   const child = spawn(process.execPath, [cliPath, ...cliArgs], {
-    env: { ...process.env, TEAMCLAUDE_CONFIG: configPath },
+    env: { ...process.env, RELAYCREW_CONFIG: configPath },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let stdout = '';
@@ -71,5 +71,5 @@ test('rename without a new name prints usage and fails', async () => {
   const configPath = await writeConfig();
   const res = await runCli(configPath, ['rename', 'a@example.com']);
   assert.equal(res.code, 1);
-  assert.match(res.stderr, /Usage: teamclaude rename/);
+  assert.match(res.stderr, /Usage: relaycrew rename/);
 });

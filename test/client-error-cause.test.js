@@ -6,7 +6,7 @@ import { createProxyServer } from '../src/server.js';
 
 // What the client is told when no account served it has to name the real cause.
 // It said «Upstream refused the credential for account … (403). Check the
-// account, then re-add it with: teamclaude login» for every refusal — including
+// account, then re-add it with: relaycrew login» for every refusal — including
 // a 401 on a token whose renewal had just failed for a reason that a re-login
 // does not touch: the store's lock denied, the token endpoint's 429.
 
@@ -46,7 +46,7 @@ test('a renewal the coordinator could not do: the client is told why, not to re-
     const r = await f.send();
     assert.match(r.message, /could not be renewed/);
     assert.ok(r.message.includes('this install may not renew this account right now'), r.message);
-    assert.doesNotMatch(r.message, /teamclaude login|\(403\)/, r.message);
+    assert.doesNotMatch(r.message, /relaycrew login|\(403\)/, r.message);
   } finally { f.close(); }
 });
 
@@ -57,7 +57,7 @@ test('a renewal the token endpoint refused for now (429): the client is told so'
   try {
     const r = await f.send();
     assert.match(r.message, /could not be renewed.*429/);
-    assert.doesNotMatch(r.message, /teamclaude login|\(403\)/, r.message);
+    assert.doesNotMatch(r.message, /relaycrew login|\(403\)/, r.message);
   } finally { f.close(); }
 });
 
@@ -66,6 +66,6 @@ test('control: a credential upstream refuses with no failed renewal keeps the ad
   const f = await fleet(live, { upstreamStatus: 403 });
   try {
     const r = await f.send();
-    assert.match(r.message, /refused the credential for account "a" \(403\).*teamclaude login/);
+    assert.match(r.message, /refused the credential for account "a" \(403\).*relaycrew login/);
   } finally { f.close(); }
 });

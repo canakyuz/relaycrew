@@ -8,17 +8,17 @@ Clone this fork, install Node.js 20 or newer, and run the commands below as the 
 
 ```sh
 umask 077
-mkdir -p "$HOME/.config/teamclaude-team"
-export TEAMCLAUDE_CONFIG="$HOME/.config/teamclaude-team/config.json"
+mkdir -p "$HOME/.config/relaycrew-team"
+export RELAYCREW_CONFIG="$HOME/.config/relaycrew-team/config.json"
 node src/index.js team init
 node src/index.js login
 node src/index.js team accounts
 node src/index.js team add alice --accounts '<account-id>,<another-account-id>' --max-concurrent 4
 ```
 
-Keep `TEAMCLAUDE_CONFIG` set for subsequent commands. Provider login uses the original interactive flows described in [accounts](accounts.md). Use only accounts your organization is authorized to use for this arrangement.
+Keep `RELAYCREW_CONFIG` set for subsequent commands. Provider login uses the original interactive flows described in [accounts](accounts.md). Use only accounts your organization is authorized to use for this arrangement.
 
-Start the gateway under your service manager with `node /path/to/teamclaude/src/index.js server --headless`. Set `TEAMCLAUDE_CONFIG` and `TEAMCLAUDE_DISABLE_AUTOUPDATE=1` in the service environment. Bind the gateway to localhost behind HTTPS or connect through an SSH tunnel. Keep access to the protected configuration and state directory restricted to the gateway Unix user.
+Start the gateway under your service manager with `node /path/to/relaycrew/src/index.js server --headless`. Set `RELAYCREW_CONFIG` and `RELAYCREW_DISABLE_AUTOUPDATE=1` in the service environment. Bind the gateway to localhost behind HTTPS or connect through an SSH tunnel. Keep access to the protected configuration and state directory restricted to the gateway Unix user.
 
 For an SSH connection, forward the gateway port from each developer machine.
 
@@ -39,8 +39,8 @@ docker compose build
 docker compose run --rm gateway team init
 docker compose run --rm gateway login
 docker compose up -d
-docker compose exec gateway teamclaude team accounts
-docker compose exec gateway teamclaude team add alice --accounts '<account-id>'
+docker compose exec gateway relaycrew team accounts
+docker compose exec gateway relaycrew team add alice --accounts '<account-id>'
 ```
 
 `data/` contains secrets and is excluded from Git and the Docker build context. Back it up as private credential material. The container health check authenticates with the administrator key stored in its mounted configuration. Provider browser login may require an SSH callback tunnel; see the account login instructions.
@@ -82,7 +82,7 @@ For an OpenAI API-key account, use a provider base URL ending in `/v1` and the A
 
 ## Inspect member usage
 
-Send `GET /teamclaude/me` with the member key in `x-api-key`. The response contains that member's account IDs or wildcard, active request count, concurrency limit, and token counters. It contains no provider tokens, other members, fleet sessions, or account names.
+Send `GET /relaycrew/me` with the member key in `x-api-key`. The response contains that member's account IDs or wildcard, active request count, concurrency limit, and token counters. It contains no provider tokens, other members, fleet sessions, or account names.
 
 `team list` never prints credentials. `team rotate <name>` replaces a key and prints the replacement once. `team revoke <name>` disables the member. Reload invalidates old tunnel identities and cancels active requests whose access was revoked. Requests already accepted by a provider may have incurred usage before cancellation.
 

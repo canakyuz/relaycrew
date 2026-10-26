@@ -11,14 +11,14 @@ import { join } from 'node:path';
 
 async function withConfigDir(fn) {
   const dir = await mkdtemp(join(tmpdir(), 'tc-atomic-'));
-  const prev = process.env.TEAMCLAUDE_CONFIG;
-  process.env.TEAMCLAUDE_CONFIG = join(dir, 'teamclaude.json');
+  const prev = process.env.RELAYCREW_CONFIG;
+  process.env.RELAYCREW_CONFIG = join(dir, 'relaycrew.json');
   try {
     const cfg = await import('../src/config.js');
-    await fn({ dir, cfg, path: process.env.TEAMCLAUDE_CONFIG });
+    await fn({ dir, cfg, path: process.env.RELAYCREW_CONFIG });
   } finally {
-    if (prev === undefined) delete process.env.TEAMCLAUDE_CONFIG;
-    else process.env.TEAMCLAUDE_CONFIG = prev;
+    if (prev === undefined) delete process.env.RELAYCREW_CONFIG;
+    else process.env.RELAYCREW_CONFIG = prev;
   }
 }
 
@@ -29,7 +29,7 @@ test('saveConfig writes the whole document and leaves no temp file behind', asyn
     const config = { proxy: { port: 1, apiKey: 'tc-secret' }, accounts: [{ name: 'a', refreshToken: 'rt' }] };
     await cfg.saveConfig(config);
     assert.deepEqual(JSON.parse(await readFile(path, 'utf-8')), config);
-    assert.deepEqual(await readdir(dir), ['teamclaude.json'], 'only the config itself is on disk');
+    assert.deepEqual(await readdir(dir), ['relaycrew.json'], 'only the config itself is on disk');
     if (onPosix) assert.equal((await stat(path)).mode & 0o777, 0o600);
   });
 });
@@ -40,7 +40,7 @@ test('saveConfig replaces a pre-existing file and tightens its mode', async () =
     if (onPosix) await chmod(path, 0o644);
     await cfg.saveConfig({ fresh: true });
     assert.deepEqual(JSON.parse(await readFile(path, 'utf-8')), { fresh: true });
-    assert.deepEqual(await readdir(dir), ['teamclaude.json']);
+    assert.deepEqual(await readdir(dir), ['relaycrew.json']);
     if (onPosix) assert.equal((await stat(path)).mode & 0o777, 0o600, 'a world-readable config becomes 0600 on save');
   });
 });
@@ -50,7 +50,7 @@ test('saveState is atomic the same way', async () => {
     const statePath = cfg.getStatePath();
     await cfg.saveState({ quota: { a: 1 } });
     assert.deepEqual(JSON.parse(await readFile(statePath, 'utf-8')), { quota: { a: 1 } });
-    assert.deepEqual(await readdir(dir), ['teamclaude.state.json']);
+    assert.deepEqual(await readdir(dir), ['relaycrew.state.json']);
     if (onPosix) assert.equal((await stat(statePath)).mode & 0o777, 0o600);
   });
 });
@@ -62,7 +62,7 @@ test('a save that cannot complete leaves the previous config intact and no temp 
     // written, and the file on disk must still be the last complete document.
     await assert.rejects(cfg.saveConfig({ bad: 1n }), TypeError);
     assert.deepEqual(JSON.parse(await readFile(path, 'utf-8')), { good: true });
-    assert.deepEqual(await readdir(dir), ['teamclaude.json'], 'no temp file is left beside the config');
+    assert.deepEqual(await readdir(dir), ['relaycrew.json'], 'no temp file is left beside the config');
   });
 });
 
@@ -86,6 +86,6 @@ test('saveConfig follows a symlinked config to its target instead of replacing t
     await cfg.saveConfig({ proxy: { port: 2, apiKey: 'k' }, accounts: [] });
     assert.ok((await lstat(path)).isSymbolicLink(), 'the config path is still a symlink');
     assert.deepEqual(JSON.parse(await readFile(real, 'utf-8')).proxy.port, 2, 'the link target received the write');
-    assert.deepEqual((await readdir(dir)).sort(), ['real.json', 'teamclaude.json']);
+    assert.deepEqual((await readdir(dir)).sort(), ['real.json', 'relaycrew.json']);
   });
 });

@@ -114,12 +114,12 @@ test('restoreQuotaState ignores a non-array / missing payload', () => {
 });
 
 test('getStatePath sits beside the config as a .state.json sibling', () => {
-  const prev = process.env.TEAMCLAUDE_CONFIG;
-  process.env.TEAMCLAUDE_CONFIG = '/tmp/teamclaude-xyz.json';
+  const prev = process.env.RELAYCREW_CONFIG;
+  process.env.RELAYCREW_CONFIG = '/tmp/relaycrew-xyz.json';
   try {
-    assert.equal(getStatePath(), '/tmp/teamclaude-xyz.state.json');
+    assert.equal(getStatePath(), '/tmp/relaycrew-xyz.state.json');
   } finally {
-    if (prev === undefined) delete process.env.TEAMCLAUDE_CONFIG;
-    else process.env.TEAMCLAUDE_CONFIG = prev;
+    if (prev === undefined) delete process.env.RELAYCREW_CONFIG;
+    else process.env.RELAYCREW_CONFIG = prev;
   }
 });

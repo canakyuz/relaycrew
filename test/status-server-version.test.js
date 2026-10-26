@@ -4,17 +4,17 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { spawnServer, waitForStatus, closedPort } from '../test-helpers/spawn-server.js';
 
-// `GET /teamclaude/status` reports the version of the process that answers
+// `GET /relaycrew/status` reports the version of the process that answers
 // under `server.version`. Clients (the remote TUI, a menu bar app) used to
 // infer it from the CLI they were installed with, which is the wrong answer
-// right after `teamclaude update` and before the restart — and the gate for
+// right after `relaycrew update` and before the restart — and the gate for
 // "does this proxy hot-apply key X on reload" needs the running version, not
 // the installed one. This drives the real server as a subprocess against a
-// throwaway TEAMCLAUDE_CONFIG and compares against the package.json it runs.
+// throwaway RELAYCREW_CONFIG and compares against the package.json it runs.
 
 const packageJsonPath = fileURLToPath(new URL('../package.json', import.meta.url));
 
-test('GET /teamclaude/status reports the running package version under server.version', async () => {
+test('GET /relaycrew/status reports the running package version under server.version', async () => {
   const deadPort = await closedPort();
   const server = await spawnServer({
     config: () => ({

@@ -9,7 +9,7 @@ This community fork is maintained at [sep1ol/relaycrew](https://github.com/sep1o
 - Individual member keys with creation, rotation, revocation, and usage attribution.
 - Account permissions based on stable IDs, including overlapping account pools.
 - Administrator-only fleet status, configuration controls, and management MCP.
-- Private member usage at `GET /teamclaude/me`.
+- Private member usage at `GET /relaycrew/me`.
 - Per-member concurrent request limits covering retries and streaming.
 - Credential revalidation inside existing MITM tunnels.
 - Persistent provider credentials and usage through the existing protected configuration and state files.
@@ -70,7 +70,7 @@ Run one gateway replica. Member concurrency is enforced per process. Usage stati
 
 Members can use pooled HTTP inference, directly or inside managed MITM tunnels. Arbitrary forwarding, Remote Control, and WebSocket relays are administrator-only. Team mode disables the implicit localhost trust exemption. The static dashboard HTML remains public; its fleet data requires the administrator key.
 
-The repository is named RelayCrew. The CLI command remains `teamclaude` and package metadata uses `@sep1ol/teamclaude`. This repository does not claim an npm release. Install from source or build the included Dockerfile. Automatic npm publishing requires a manually triggered workflow and publisher configuration.
+The CLI command is `relaycrew` and package metadata uses `@sep1ol/relaycrew`. Legacy `teamclaude` and `teamrouter` commands and configuration inputs remain supported. See the [migration notes](docs/brand-migration.md). This repository does not claim an npm release. Install from source or build the included Dockerfile. Automatic npm publishing requires a manually triggered workflow and publisher configuration.
 
 ## Contribute
 

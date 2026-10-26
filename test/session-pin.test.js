@@ -9,7 +9,7 @@ import { renderStatus } from '../src/status-renderer.js';
 import { sessionPinsText } from '../src/dashboard.js';
 import { syncAccountsFromDisk } from '../src/sync-accounts.js';
 
-// `teamclaude switch <account>` moves the fleet. `--session` moves one session
+// `relaycrew switch <account>` moves the fleet. `--session` moves one session
 // (issue #543): a hard pin like TC_ACCT, set at runtime and keyed by the
 // session id the client sends, that leaves every other session where it was.
 
@@ -61,7 +61,7 @@ const message = (port, sessionId) => fetch(`http://127.0.0.1:${port}/v1/messages
 
 /** @param {number} port @param {any} body */
 const pin = async (port, body, key = 'k') => {
-  const res = await fetch(`http://127.0.0.1:${port}/teamclaude/session-pin`, {
+  const res = await fetch(`http://127.0.0.1:${port}/relaycrew/session-pin`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': key },
     body: typeof body === 'string' ? body : JSON.stringify(body),

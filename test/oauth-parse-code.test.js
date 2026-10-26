@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseAuthCode } from '../src/oauth.js';
 
-// The pasted-code login (`teamclaude login --token`) and the browser flow's
+// The pasted-code login (`relaycrew login --token`) and the browser flow's
 // paste fallback both go through parseAuthCode, the TUI's login panel too.
 // Three input shapes; the two that carry a state must carry the right one.
 

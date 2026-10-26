@@ -1,4 +1,4 @@
-// Outbound (egress) proxy for everything teamclaude sends to Anthropic.
+// Outbound (egress) proxy for everything relaycrew sends to Anthropic.
 //
 // Distinct from two other things that also say "proxy" in this codebase:
 //   - `config.proxy` is the LOCAL server Claude Code talks to (inbound).
@@ -112,8 +112,8 @@ export function bypassesProxy(hostname, noProxy) {
 
 // ── Self-proxy guard ─────────────────────────────────────────
 //
-// TeamClaude honours HTTPS_PROXY for its own egress, and `teamclaude env`
-// exports HTTPS_PROXY pointing AT TeamClaude (that is how MITM mode aims the
+// RelayCrew honours HTTPS_PROXY for its own egress, and `relaycrew env`
+// exports HTTPS_PROXY pointing AT RelayCrew (that is how MITM mode aims the
 // client). So a server or CLI started from a shell already set up for MITM
 // inherits ITSELF as its egress proxy.
 //

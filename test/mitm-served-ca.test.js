@@ -11,7 +11,7 @@ import { spawnServer, closedPort } from '../test-helpers/spawn-server.js';
 import { generateCertChain } from '../src/x509.js';
 
 // The MITM chain a client is handed has to be the one the running proxy
-// presents. `teamclaude env` and `run` used to regenerate the whole chain, CA
+// presents. `relaycrew env` and `run` used to regenerate the whole chain, CA
 // included, as soon as the stored leaf fell short: the first Codex account
 // adds chatgpt.com to the hosts it must name, and a leaf with under 30 days
 // left is renewed early. The old CA's key is never kept, so the new leaf came
@@ -26,9 +26,9 @@ const T = { timeout: 60_000 };
 const claude = { name: 'claude-a', type: 'apikey', apiKey: 'k1' };
 const codex = { name: 'codex-c', type: 'apikey', apiKey: 'k2', provider: 'codex' };
 
-/** `teamclaude env` against `configPath`, with no proxy inherited from the shell. */
+/** `relaycrew env` against `configPath`, with no proxy inherited from the shell. */
 function runEnv(configPath) {
-  const env = { ...process.env, TEAMCLAUDE_CONFIG: configPath, TEAMCLAUDE_DISABLE_AUTOUPDATE: '1' };
+  const env = { ...process.env, RELAYCREW_CONFIG: configPath, RELAYCREW_DISABLE_AUTOUPDATE: '1' };
   for (const key of Object.keys(env)) if (/^(https?|all|no)_proxy$/i.test(key)) delete env[key];
   const child = spawn(process.execPath, [cliPath, 'env', '--mitm'], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   let stdout = '';
@@ -87,11 +87,11 @@ test('env keeps the CA the running proxy presents when the host list grows', T, 
     // The proxy reads the chain here and presents it from now on.
     assert.match(await fetchTestHost(server.port, ca), /mitm-proxy-ok/);
 
-    // `teamclaude login --codex` writes the account and reloads the server.
+    // `relaycrew login --codex` writes the account and reloads the server.
     const config = JSON.parse(await readFile(server.configPath, 'utf8'));
     config.accounts.push(codex);
     await writeFile(server.configPath, JSON.stringify(config));
-    const reload = await fetch(`http://127.0.0.1:${server.port}/teamclaude/reload`, { method: 'POST' });
+    const reload = await fetch(`http://127.0.0.1:${server.port}/relaycrew/reload`, { method: 'POST' });
     assert.equal(reload.status, 200, await reload.text());
 
     const second = await runEnv(server.configPath);
@@ -111,9 +111,9 @@ test('a starting server renews a stored chain that falls short before its port o
   const deadPort = await closedPort();
   // Ten days left: under the 30-day margin, so it is due for renewal.
   const stale = generateCertChain(['127.0.0.1', 'api.anthropic.com', 'www.example.org'], { leafDays: 10 });
-  await writeFile(join(dir, 'teamclaude-ca.pem'), stale.caCertPem);
-  await writeFile(join(dir, 'teamclaude-leaf.pem'), stale.leafCertPem);
-  await writeFile(join(dir, 'teamclaude-leaf.key'), stale.leafKeyPem, { mode: 0o600 });
+  await writeFile(join(dir, 'relaycrew-ca.pem'), stale.caCertPem);
+  await writeFile(join(dir, 'relaycrew-leaf.pem'), stale.leafCertPem);
+  await writeFile(join(dir, 'relaycrew-leaf.key'), stale.leafKeyPem, { mode: 0o600 });
   const server = await spawnServer({
     dir,
     config: () => ({ upstream: `http://127.0.0.1:${deadPort}`, upstreamProxy: false, accounts: [claude] }),
@@ -122,7 +122,7 @@ test('a starting server renews a stored chain that falls short before its port o
     // Renewed by the time the port answers. Left to the first intercepted
     // CONNECT, `env` would hand out the stale CA (a proxy is up, so it is
     // kept) and the client launched with it would meet the renewed leaf.
-    const onDisk = await readFile(join(dir, 'teamclaude-ca.pem'), 'utf8');
+    const onDisk = await readFile(join(dir, 'relaycrew-ca.pem'), 'utf8');
     assert.notEqual(onDisk, stale.caCertPem, 'the stale chain was still on disk once the port was open');
 
     const env = await runEnv(server.configPath);

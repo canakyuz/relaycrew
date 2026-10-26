@@ -4,7 +4,7 @@ This fork adds an opt-in team mode to the upstream proxy. One shared account man
 
 ## Usage
 
-An administrator runs `teamclaude team init`, imports provider credentials, lists stable account IDs with `teamclaude team accounts`, and issues a member credential with `teamclaude team add`. A member sends that credential through `x-api-key` for HTTP inference or Proxy-Authorization for a managed MITM tunnel.
+An administrator runs `relaycrew team init`, imports provider credentials, lists stable account IDs with `relaycrew team accounts`, and issues a member credential with `relaycrew team add`. A member sends that credential through `x-api-key` for HTTP inference or Proxy-Authorization for a managed MITM tunnel.
 
 ## Shape
 

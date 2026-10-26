@@ -1,8 +1,8 @@
 // The status dashboard: a single self-contained HTML page served at
-// GET /teamclaude/dashboard, rendering /teamclaude/status for humans.
+// GET /relaycrew/dashboard, rendering /relaycrew/status for humans.
 //
 // The page itself contains NO data — it is a static asset whose script fetches
-// /teamclaude/status (same origin) with the proxy key and re-renders every few
+// /relaycrew/status (same origin) with the proxy key and re-renders every few
 // seconds. That split is what lets the asset be served without the key (a
 // browser address bar cannot send x-api-key) while every byte of actual status
 // stays behind the existing gate. The key is asked for only when the server
@@ -354,7 +354,7 @@ export function sessionRows(sessions) {
 }
 
 // "pinned: 3f2a1b9c → api-1, 9d0e4c11 → work" — the sessions an operator held
-// on one account (`teamclaude switch --session`), or '' when there are none.
+// on one account (`relaycrew switch --session`), or '' when there are none.
 /** @param {any} pins */
 export function sessionPinsText(pins) {
   if (!Array.isArray(pins) || !pins.length) return '';
@@ -389,12 +389,12 @@ export function uniqSorted(values) {
   return Object.keys(seen).sort();
 }
 
-// The request the switch button sends: POST /teamclaude/switch with the same
+// The request the switch button sends: POST /relaycrew/switch with the same
 // key the status poll uses. Pure, so the test suite can send exactly this
 // through a real proxy and prove the same-origin CSRF gate lets the page in.
 export function switchRequest(name, key) {
   return {
-    url: '/teamclaude/switch',
+    url: '/relaycrew/switch',
     init: {
       method: 'POST',
       headers: { 'x-api-key': key || '', 'content-type': 'application/json' },
@@ -412,7 +412,7 @@ export function switchRequest(name, key) {
  */
 export function thresholdRequest(percent, key) {
   return {
-    url: '/teamclaude/threshold',
+    url: '/relaycrew/threshold',
     init: {
       method: 'POST',
       headers: { 'x-api-key': key || '', 'content-type': 'application/json' },
@@ -471,7 +471,7 @@ export function accountControlRequest(name, spec, key) {
     body.disabled = spec.disabled;
   }
   return {
-    url: isPriority ? '/teamclaude/priority' : '/teamclaude/disable',
+    url: isPriority ? '/relaycrew/priority' : '/relaycrew/disable',
     init: {
       method: 'POST',
       headers: { 'x-api-key': key || '', 'content-type': 'application/json' },
@@ -699,7 +699,7 @@ export function problems(status) {
   // Deliberately no spend line. `usedMinor` is month-to-date overage, so on a
   // fleet that has overage switched on it is non-zero for most of the month —
   // an always-lit banner, which is the thing this is trying not to be. The
-  // account card and `teamclaude status` both carry it, with the amount.
+  // account card and `relaycrew status` both carry it, with the amount.
 
   return out;
 }
@@ -757,7 +757,7 @@ const PAGE = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TeamClaude</title>
+<title>RelayCrew</title>
 <style>
   /* Dark is the default, and stays the default for a viewer whose system says
      nothing. The light palette is applied two ways: by the media query when no
@@ -867,7 +867,15 @@ const PAGE = `<!doctype html>
 <script>
 (function () {
   try {
-    var t = localStorage.getItem('teamclaude-dashboard-theme');
+    ['key', 'theme'].forEach(function (suffix) {
+      var key = 'relaycrew-dashboard-' + suffix;
+      ['teamrouter', 'teamclaude'].forEach(function (name) {
+        var previous = name + '-dashboard-' + suffix;
+        if (localStorage.getItem(key) === null && localStorage.getItem(previous) !== null) localStorage.setItem(key, localStorage.getItem(previous));
+        localStorage.removeItem(previous);
+      });
+    });
+    var t = localStorage.getItem('relaycrew-dashboard-theme');
     if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
   } catch (e) { /* storage disabled: the media query still decides */ }
 })();
@@ -876,13 +884,13 @@ const PAGE = `<!doctype html>
 <body>
 <main>
   <div id="keybox">
-    <h1>TeamClaude</h1>
+    <h1>RelayCrew</h1>
     <p class="sub">Enter your proxy key to view status.</p>
     <input id="key" type="password" placeholder="tc-..." autocomplete="off">
     <br><button id="go">Connect</button>
   </div>
   <div id="app" style="display:none">
-    <h1>TeamClaude</h1>
+    <h1>RelayCrew</h1>
     <p class="sub" id="summary"></p>
     <div class="actions">
       <button id="reload" type="button">Reload config</button>
@@ -928,8 +936,8 @@ const PAGE = `<!doctype html>
 <script>
 (function () {
   'use strict';
-  var KEY = 'teamclaude-dashboard-key';
-  var THEME_KEY = 'teamclaude-dashboard-theme';
+  var KEY = 'relaycrew-dashboard-key';
+  var THEME_KEY = 'relaycrew-dashboard-theme';
   var POLL_MS = 5000;
   var timer = null;
   var lastStatus = null;
@@ -1056,12 +1064,12 @@ ${SHARED_HELPERS}
     // last here is overwritten by that before any click can fire.
     // A control this key would be refused is not drawn at all; the line under
     // the actions says why, once (callerNotice).
-    if (callerCan(caller, '/teamclaude/disable')) {
+    if (callerCan(caller, '/relaycrew/disable')) {
       var ctlDisable = el('button', 'act', a.disabled ? 'enable' : 'disable');
       ctlDisable.addEventListener('click', function () { doControlAccount(a.name, cardNoteKey(a), { disabled: !a.disabled }, ctlDisable); });
       head.appendChild(ctlDisable);
     }
-    if (!a.disabled && callerCan(caller, '/teamclaude/priority')) {
+    if (!a.disabled && callerCan(caller, '/relaycrew/priority')) {
       var ctlFirst = el('button', 'act', 'prioritize');
       ctlFirst.addEventListener('click', function () { doControlAccount(a.name, cardNoteKey(a), { place: 'first' }, ctlFirst); });
       head.appendChild(ctlFirst);
@@ -1375,7 +1383,7 @@ ${SHARED_HELPERS}
     var thrInput = document.getElementById('thrVal');
     if (document.activeElement !== thrInput) thrInput.value = thresholdPercentText(s.switchThreshold);
     // Kept visible read-only: the number still tells a client where the fleet switches.
-    var canThreshold = callerCan(s.caller, '/teamclaude/threshold');
+    var canThreshold = callerCan(s.caller, '/relaycrew/threshold');
     thrInput.disabled = !canThreshold;
     document.getElementById('thrSet').style.display = canThreshold ? '' : 'none';
     var notice = callerNotice(s.caller);
@@ -1552,7 +1560,7 @@ ${SHARED_HELPERS}
   }
 
   function poll() {
-    fetch('/teamclaude/status', { headers: { 'x-api-key': localStorage.getItem(KEY) || '' } })
+    fetch('/relaycrew/status', { headers: { 'x-api-key': localStorage.getItem(KEY) || '' } })
       .then(function (res) {
         // 403 is the loopback exemption refusing a key-less request (a Host
         // that does not name this machine, e.g. behind a local reverse proxy
@@ -1628,8 +1636,8 @@ ${SHARED_HELPERS}
     applyTheme(theme);
   });
 
-  document.getElementById('reload').addEventListener('click', function () { doControl('/teamclaude/reload', 'config reload', this); });
-  document.getElementById('probe').addEventListener('click', function () { doControl('/teamclaude/probe', 'quota probe', this); });
+  document.getElementById('reload').addEventListener('click', function () { doControl('/relaycrew/reload', 'config reload', this); });
+  document.getElementById('probe').addEventListener('click', function () { doControl('/relaycrew/probe', 'quota probe', this); });
   document.getElementById('thrSet').addEventListener('click', function () { doThreshold(this); });
   // A client key is a valid key, so nothing else on the page would ever ask for
   // another one: the operator needs a way back to the key box.

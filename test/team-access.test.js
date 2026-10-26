@@ -91,7 +91,7 @@ function raw(port, lines) {
     socket.once('end', () => resolve(''));
   });
 }
-const me = (port, key = ALICE) => request(port, { key, method: 'GET', path: '/teamclaude/me' });
+const me = (port, key = ALICE) => request(port, { key, method: 'GET', path: '/relaycrew/me' });
 
 test('team mode requires a valid enabled key even on loopback and keeps administrator access', { timeout: 10000 }, async t => {
   const f = await fixture(t);
@@ -101,7 +101,7 @@ test('team mode requires a valid enabled key even on loopback and keeps administ
     assert.equal(reply.json().error.type, 'authentication_error');
   }
   assert.equal(f.seen.length, 0);
-  assert.equal((await request(f.port, { key: ADMIN, path: '/teamclaude/status', method: 'GET' })).status, 200);
+  assert.equal((await request(f.port, { key: ADMIN, path: '/relaycrew/status', method: 'GET' })).status, 200);
   assert.equal((await request(f.port, { key: ADMIN, path: '/tc-acct/alpha/v1/messages' })).status, 200);
   assert.equal(f.seen[0].headers.authorization, 'Bearer upstream-alpha');
 });
@@ -110,15 +110,15 @@ test('members cannot read or mutate control routes through aliases or encoded pa
   let mutations = 0;
   const f = await fixture(t, { hooks: { reload: () => { mutations++; }, getStatusExtra: () => ({ secretFleetData: true }) } });
   const routes = [
-    ['GET', '/teamclaude/status'], ['GET', '/teamclaude/quota'],
-    ['POST', '/teamclaude/reload'], ['POST', '/teamclaude/switch'],
-    ['POST', '/teamclaude/priority'], ['POST', '/teamclaude/disable'],
-    ['POST', '/teamclaude/threshold'], ['POST', '/teamclaude/probe'],
-    ['POST', '/teamclaude/mcp'], ['GET', '/teamclaude/mcp/'],
-    ['GET', '/teamrouter/status'], ['POST', '/teamrouter/reload'],
+    ['GET', '/relaycrew/status'], ['GET', '/relaycrew/quota'],
+    ['POST', '/relaycrew/reload'], ['POST', '/relaycrew/switch'],
+    ['POST', '/relaycrew/priority'], ['POST', '/relaycrew/disable'],
+    ['POST', '/relaycrew/threshold'], ['POST', '/relaycrew/probe'],
+    ['POST', '/relaycrew/mcp'], ['GET', '/relaycrew/mcp/'],
+    ['GET', '/relaycrew/status'], ['POST', '/relaycrew/reload'],
     ['GET', '/%74eamclaude/status'], ['GET', '/%74eamrouter/status'],
-    ['GET', '/teamclaude%2fstatus'], ['GET', '/teamclaude\\status'],
-    ['GET', '/tc-acct/beta/teamclaude/status'],
+    ['GET', '/relaycrew%2fstatus'], ['GET', '/relaycrew\\status'],
+    ['GET', '/tc-acct/beta/relaycrew/status'],
     ['GET', '/api/oauth/profile'], ['POST', '/v1/oauth/token'],
     ['GET', '/v1/code/sessions'], ['POST', '/anything-else'],
   ];
@@ -387,7 +387,7 @@ test('malformed team policy cannot start an open or partially restricted proxy',
 test('team mode stays opt-in for an existing loopback proxy', { timeout: 10000 }, async t => {
   const f = await fixture(t, { proxyConfig: { apiKey: ADMIN, clientKeys: [{ name: 'legacy', key: ALICE }] } });
   assert.equal((await request(f.port, { key: null })).status, 200);
-  assert.equal((await request(f.port, { key: ALICE, method: 'GET', path: '/teamclaude/status' })).status, 200);
+  assert.equal((await request(f.port, { key: ALICE, method: 'GET', path: '/relaycrew/status' })).status, 200);
   assert.equal(f.seen[0].headers.authorization, 'Bearer upstream-alpha');
 });
 
@@ -417,18 +417,18 @@ test('rotated and disabled member keys stop authenticating on a running proxy', 
 });
 
 test('loading a malformed team policy rejects it before startup', { timeout: 10000 }, async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'teamclaude-team-policy-'));
+  const directory = await mkdtemp(join(tmpdir(), 'relaycrew-team-policy-'));
   const path = join(directory, 'config.json');
-  const previous = process.env.TEAMCLAUDE_CONFIG;
-  process.env.TEAMCLAUDE_CONFIG = path;
+  const previous = process.env.RELAYCREW_CONFIG;
+  process.env.RELAYCREW_CONFIG = path;
   try {
     for (const proxy of [{ ...teamProxy(), apiKey: null }, { ...teamProxy(), clientKeys: [{ name: 'alice', key: ALICE }] }]) {
       await writeFile(path, JSON.stringify({ proxy, accounts: [] }));
       await assert.rejects(loadConfig());
     }
   } finally {
-    if (previous === undefined) delete process.env.TEAMCLAUDE_CONFIG;
-    else process.env.TEAMCLAUDE_CONFIG = previous;
+    if (previous === undefined) delete process.env.RELAYCREW_CONFIG;
+    else process.env.RELAYCREW_CONFIG = previous;
     await rm(directory, { recursive: true, force: true });
   }
 });

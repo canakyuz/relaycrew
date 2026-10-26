@@ -88,7 +88,7 @@ test('returns 502 (not a hang) when the target host is unreachable', async () =>
   proxy.close();
 });
 
-// Proxy credentials belong to TeamClaude; an unrelated x-api-key belongs to
+// Proxy credentials belong to RelayCrew; an unrelated x-api-key belongs to
 // the application using HTTP_PROXY and must still reach that application's API.
 for (const { name, proxyConfig, presented, expected, status = 200 } of [
   { name: 'shared proxy key', proxyConfig: { apiKey: 'tc-shared', trustLoopback: false }, presented: 'tc-shared', expected: undefined },
@@ -132,7 +132,7 @@ for (const { name, proxyConfig, presented, expected, status = 200 } of [
 // ── Destination policy ───────────────────────────────────────
 //
 // The relay is transparent, and "transparent to anywhere" included this machine:
-// `GET http://127.0.0.1:<our port>/teamclaude/status` arrived at our own listener
+// `GET http://127.0.0.1:<our port>/relaycrew/status` arrived at our own listener
 // from a loopback socket and passed the API-key gate as a local caller — so a
 // remote client holding only a low-trust key had the whole control plane, plus
 // any loopback-only service and the cloud metadata address.
@@ -166,7 +166,7 @@ test("a forward to the proxy's own listener is refused, not answered as a local 
     // The test client is itself loopback and so passes the gate for the relay
     // request; what matters is that the relayed hop is refused rather than
     // served — the answer must be the 403, never the status document.
-    const r = await proxyRequest({ proxyPort, absoluteUrl: `http://127.0.0.1:${proxyPort}/teamclaude/status` });
+    const r = await proxyRequest({ proxyPort, absoluteUrl: `http://127.0.0.1:${proxyPort}/relaycrew/status` });
     assert.equal(r.status, 403);
     assert.doesNotMatch(r.body, /accounts/);
   } finally {

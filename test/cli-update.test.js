@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-// `teamclaude update` as a subprocess, run from a copy of the package laid out
+// `relaycrew update` as a subprocess, run from a copy of the package laid out
 // where an installer puts it: the command reads the install kind off the
 // package root it runs from. Two stubs keep the run off the network and make an
 // npm install visible. A preload answers the registry with a newer release, and
@@ -27,13 +27,13 @@ const NPM_STUB = [
 ].join('\n');
 
 /**
- * Copy the package to `<tmp>/<pkgDir>` and run `teamclaude update` from it,
+ * Copy the package to `<tmp>/<pkgDir>` and run `relaycrew update` from it,
  * with `npm root -g` answering `<tmp>/<npmRoot>`.
  * @param {{ pkgDir: string, npmRoot: string }} layout
  */
 async function runUpdate({ pkgDir, npmRoot }) {
   // The real path: the CLI derives its package root from its own resolved URL.
-  const dir = await realpath(await mkdtemp(join(tmpdir(), 'teamclaude-update-')));
+  const dir = await realpath(await mkdtemp(join(tmpdir(), 'relaycrew-update-')));
   try {
     const root = join(dir, pkgDir);
     await mkdir(root, { recursive: true });
@@ -52,8 +52,8 @@ async function runUpdate({ pkgDir, npmRoot }) {
         PATH: bin,
         NPM_LOG: npmLog,
         NPM_ROOT: join(dir, npmRoot),
-        TEAMCLAUDE_CONFIG: join(dir, 'config.json'),
-        TEAMCLAUDE_DISABLE_AUTOUPDATE: '1',
+        RELAYCREW_CONFIG: join(dir, 'config.json'),
+        RELAYCREW_DISABLE_AUTOUPDATE: '1',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -79,11 +79,11 @@ async function runUpdate({ pkgDir, npmRoot }) {
 // "Updated", and leave the pnpm copy, the one on PATH, on the old version.
 test('update from a pnpm copy names the pnpm command and never runs npm', { skip: process.platform === 'win32' }, async () => {
   const result = await runUpdate({
-    pkgDir: 'pnpm/global/v11/node_modules/.pnpm/@sep1ol+teamclaude@1.1.25/node_modules/@sep1ol/teamclaude',
+    pkgDir: 'pnpm/global/v11/node_modules/.pnpm/@sep1ol+relaycrew@1.1.25/node_modules/@sep1ol/relaycrew',
     npmRoot: 'lib/node_modules',
   });
   assert.equal(result.code, 0, result.stderr);
-  assert.match(result.stdout, /^This copy was installed with pnpm, which npm cannot update\. Run: pnpm add -g @sep1ol\/teamclaude@latest$/m);
+  assert.match(result.stdout, /^This copy was installed with pnpm, which npm cannot update\. Run: pnpm add -g @sep1ol\/relaycrew@latest$/m);
   assert.doesNotMatch(result.stdout, /Updat(?:ing|ed) /);
   assert.equal(result.npmCalls, '');
 });
@@ -92,10 +92,10 @@ test('update from a pnpm copy names the pnpm command and never runs npm', { skip
 // install, so the empty record above is the command's doing.
 test('update from an npm global copy still installs with npm', { skip: process.platform === 'win32' }, async () => {
   const result = await runUpdate({
-    pkgDir: 'lib/node_modules/@sep1ol/teamclaude',
+    pkgDir: 'lib/node_modules/@sep1ol/relaycrew',
     npmRoot: 'lib/node_modules',
   });
   assert.equal(result.code, 0, result.stderr);
   assert.match(result.stdout, /^Updated to 999\.0\.0\./m);
-  assert.match(result.npmCalls, /^install -g @sep1ol\/teamclaude@999\.0\.0$/m);
+  assert.match(result.npmCalls, /^install -g @sep1ol\/relaycrew@999\.0\.0$/m);
 });

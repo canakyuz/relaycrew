@@ -19,11 +19,11 @@ const accounts = (names) => names.map(n => ({ name: n, type: 'apikey', apiKey: `
 
 // Resolve the test-only .invalid names at the DNS boundary so network outages
 // cannot turn an expected NXDOMAIN into a two-minute resolver wait.
-const unresolvable = () => `http://nx-${Date.now()}-${Math.random().toString(36).slice(2)}-teamclaude.invalid`;
+const unresolvable = () => `http://nx-${Date.now()}-${Math.random().toString(36).slice(2)}-relaycrew.invalid`;
 
 const lookup = dns.lookup.bind(dns);
 test.beforeEach(t => t.mock.method(dns, 'lookup', (hostname, options, callback) => {
-  if (!hostname.endsWith('-teamclaude.invalid')) return lookup(hostname, options, callback);
+  if (!hostname.endsWith('-relaycrew.invalid')) return lookup(hostname, options, callback);
   const done = typeof options === 'function' ? options : callback;
   const error = Object.assign(new Error(`getaddrinfo ENOTFOUND ${hostname}`), { code: 'ENOTFOUND', syscall: 'getaddrinfo', hostname });
   process.nextTick(() => done(error));

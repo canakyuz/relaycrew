@@ -48,7 +48,7 @@ export const PANEL_LOGIN_TIMEOUT_MS = 5 * 60_000;
  * container, a console login on a server). Neither test can see everything: a
  * server started by a service inside tmux and attached over SSH later carries
  * the environment it started with, not the attaching client's. That case is
- * what `TEAMCLAUDE_REMOTE` is for: `1` says remote whatever the environment
+ * what `RELAYCREW_REMOTE` is for: `1` says remote whatever the environment
  * shows, `0` says local. Nothing relies on the answer alone. It decides
  * whether a browser is worth opening here (and, for Claude, the loopback
  * listener only that browser could reach); the TUI panel and a CLI login on a

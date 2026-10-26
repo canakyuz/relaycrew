@@ -15,12 +15,12 @@ async function withConfig(raw, fn) {
   const dir = await mkdtemp(join(tmpdir(), 'tc-config-'));
   const path = join(dir, 'config.json');
   await writeFile(path, JSON.stringify(raw));
-  const prev = process.env.TEAMCLAUDE_CONFIG;
-  process.env.TEAMCLAUDE_CONFIG = path;
+  const prev = process.env.RELAYCREW_CONFIG;
+  process.env.RELAYCREW_CONFIG = path;
   try {
     await fn(path);
   } finally {
-    if (prev === undefined) delete process.env.TEAMCLAUDE_CONFIG; else process.env.TEAMCLAUDE_CONFIG = prev;
+    if (prev === undefined) delete process.env.RELAYCREW_CONFIG; else process.env.RELAYCREW_CONFIG = prev;
   }
 }
 

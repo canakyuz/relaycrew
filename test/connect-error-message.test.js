@@ -203,7 +203,7 @@ test('a tunnel whose every address refuses is logged with its reasons', { skip: 
   assert.ok(line.includes('; '), `the reasons were not joined: ${JSON.stringify(line)}`);
 });
 
-// The documented escape hatch, TEAMCLAUDE_UPSTREAM_GLOBAL_FETCH, routes through
+// The documented escape hatch, RELAYCREW_UPSTREAM_GLOBAL_FETCH, routes through
 // global fetch, which wraps the same connect failure in a TypeError whose own
 // message is "fetch failed". The reasons are still there, one level down.
 //
@@ -237,7 +237,7 @@ function describeThroughGlobalFetch() {
       // developer's proxy instead of the closed port this test is about.
       env: {
         ...process.env,
-        TEAMCLAUDE_UPSTREAM_GLOBAL_FETCH: '1',
+        RELAYCREW_UPSTREAM_GLOBAL_FETCH: '1',
         HTTPS_PROXY: '', https_proxy: '', ALL_PROXY: '', all_proxy: '',
         HTTP_PROXY: '', http_proxy: '', NO_PROXY: '*', no_proxy: '*',
       },

@@ -1,6 +1,6 @@
 // Operator pins: one client session held on one named account (issue #543).
 //
-// `teamclaude switch <account>` moves the fleet's current account, so every
+// `relaycrew switch <account>` moves the fleet's current account, so every
 // unpinned session follows it. Moving ONE running session — a long task put on
 // an API key while subscription quota recovers — used to mean exiting it and
 // relaunching under TC_ACCT. This is the runtime form of that launch pin: a map

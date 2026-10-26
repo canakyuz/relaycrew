@@ -10,7 +10,7 @@ import { X509Certificate } from 'node:crypto';
 
 // Point cert storage at a temp dir before importing modules that read the path.
 const TMP = mkdtempSync(join(tmpdir(), 'tc-mitm-'));
-process.env.TEAMCLAUDE_CONFIG = join(TMP, 'config.json');
+process.env.RELAYCREW_CONFIG = join(TMP, 'config.json');
 
 const { ensureCerts, caCertPath, TEST_HOST, leafCovers, chainShortfall, parseConnectAuthority } = await import('../src/mitm.js');
 const { AccountManager } = await import('../src/account-manager.js');
@@ -74,7 +74,7 @@ test('CONNECT to the test host is intercepted and answered locally (proxy + CA p
     assert.equal(sock.authorized, true); // our leaf trusted via the CA
     const resp = await httpOver(sock, TEST_HOST, '/hello');
     assert.match(resp, /200/);
-    assert.match(resp, /"teamclaude":"mitm-proxy-ok"/);
+    assert.match(resp, /"relaycrew":"mitm-proxy-ok"/);
     assert.match(resp, /"path":"\/hello"/);
   } finally {
     proxy.close();
@@ -193,7 +193,7 @@ test('an unparseable CONNECT target gets a 400, and a differently-cased test hos
     assert.match(await connectStatus(port, 'example.org:0'), /^HTTP\/1\.1 400 /);
     const sock = await connectTls(port, `${TEST_HOST.toUpperCase()}.:443`, caCertPem, TEST_HOST);
     const resp = await httpOver(sock, TEST_HOST, '/upper');
-    assert.match(resp, /"teamclaude":"mitm-proxy-ok"/);
+    assert.match(resp, /"relaycrew":"mitm-proxy-ok"/);
   } finally {
     proxy.close();
   }
@@ -222,9 +222,9 @@ test('ensureCerts regenerates a stored chain that is about to expire', async () 
   const dir = join(caCertPath(), '..');
   const hosts = ['api.anthropic.com', TEST_HOST];
   const short = generateCertChain(hosts, { leafDays: 5 });
-  await writeFile(join(dir, 'teamclaude-ca.pem'), short.caCertPem);
-  await writeFile(join(dir, 'teamclaude-leaf.pem'), short.leafCertPem);
-  await writeFile(join(dir, 'teamclaude-leaf.key'), short.leafKeyPem);
+  await writeFile(join(dir, 'relaycrew-ca.pem'), short.caCertPem);
+  await writeFile(join(dir, 'relaycrew-leaf.pem'), short.leafCertPem);
+  await writeFile(join(dir, 'relaycrew-leaf.key'), short.leafKeyPem);
 
   const renewed = await ensureCerts('api.anthropic.com');
   assert.notEqual(renewed.leafCertPem, short.leafCertPem);
@@ -242,9 +242,9 @@ test('ensureCerts regenerates a stored chain that is about to expire', async () 
 async function storeChain(chain) {
   const { writeFile } = await import('node:fs/promises');
   const dir = join(caCertPath(), '..');
-  await writeFile(join(dir, 'teamclaude-ca.pem'), chain.caCertPem);
-  await writeFile(join(dir, 'teamclaude-leaf.pem'), chain.leafCertPem);
-  await writeFile(join(dir, 'teamclaude-leaf.key'), chain.leafKeyPem);
+  await writeFile(join(dir, 'relaycrew-ca.pem'), chain.caCertPem);
+  await writeFile(join(dir, 'relaycrew-leaf.pem'), chain.leafCertPem);
+  await writeFile(join(dir, 'relaycrew-leaf.key'), chain.leafKeyPem);
 }
 
 test('chainShortfall names the missing host or the expiry, and nothing for a fit chain', () => {

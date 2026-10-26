@@ -129,9 +129,9 @@ import {
 // the switch, so a const declared under the switch is still in the temporal
 // dead zone when the command body runs — keep them above the dispatch.
 const ROUTE_USAGE = [
-  'Usage: teamclaude route [list]',
-  '       teamclaude route add <name> --match "<glob>[,<glob>]" [--accounts "<name-or-index>[,...]"] [--bucket <quota-bucket>] [--color <name>]',
-  '       teamclaude route rm <name>',
+  'Usage: relaycrew route [list]',
+  '       relaycrew route add <name> --match "<glob>[,<glob>]" [--accounts "<name-or-index>[,...]"] [--bucket <quota-bucket>] [--color <name>]',
+  '       relaycrew route rm <name>',
   '',
   'A route pins model ids matching its globs to an exclusive set of accounts.',
   'Omit --accounts to route to all accounts (e.g. just to override --bucket).',
@@ -140,22 +140,22 @@ const ROUTE_USAGE = [
 ].join('\n');
 
 const THRESHOLD_USAGE = [
-  'Usage: teamclaude threshold                 (show the current thresholds)',
-  '       teamclaude threshold <1-100>         (one number for every bucket)',
-  '       teamclaude threshold <bucket>=<1-100> [...]',
-  '       teamclaude threshold <bucket>=default (drop that bucket)',
+  'Usage: relaycrew threshold                 (show the current thresholds)',
+  '       relaycrew threshold <1-100>         (one number for every bucket)',
+  '       relaycrew threshold <bucket>=<1-100> [...]',
+  '       relaycrew threshold <bucket>=default (drop that bucket)',
   '',
   'The utilization at which rotation stops sending work to an account. Tenths of',
   'a percent are kept, as on the TUI settings screen. Changes apply to a running',
   'server immediately.',
 ].join('\n');
 
-const DISTRIBUTE_USAGE = 'Usage: teamclaude distribute <on|off|adaptive|load>';
+const DISTRIBUTE_USAGE = 'Usage: relaycrew distribute <on|off|adaptive|load>';
 
 const ROUTING_USAGE = [
-  'Usage: teamclaude routing <account-name|email> [--check]      (show the account\'s routing; --check tests it)',
-  '       teamclaude routing <account-name|email> <url>          (set it; --no-check skips the proxy test)',
-  '       teamclaude routing <account-name|email> none           (clear it)',
+  'Usage: relaycrew routing <account-name|email> [--check]      (show the account\'s routing; --check tests it)',
+  '       relaycrew routing <account-name|email> <url>          (set it; --no-check skips the proxy test)',
+  '       relaycrew routing <account-name|email> none           (clear it)',
   '',
   'One account\'s own egress proxy: EVERY connection made for that account —',
   'completions, token refresh, profile and quota — tunnels through it, and no',
@@ -168,10 +168,10 @@ const ROUTING_USAGE = [
 ].join('\n');
 
 const CALLBACK_USAGE = [
-  'Usage: teamclaude callback login [--no-browser] [--force]   Sign this install in to callback.net',
-  '       teamclaude callback status                            Show who is signed in',
-  '       teamclaude callback sync                              Reconcile the running server with the credential store now',
-  '       teamclaude callback logout                            Revoke the session and forget it',
+  'Usage: relaycrew callback login [--no-browser] [--force]   Sign this install in to callback.net',
+  '       relaycrew callback status                            Show who is signed in',
+  '       relaycrew callback sync                              Reconcile the running server with the credential store now',
+  '       relaycrew callback logout                            Revoke the session and forget it',
 ].join('\n');
 
 const args = process.argv.slice(2);
@@ -348,10 +348,10 @@ async function serverCommand() {
   if (config.accounts.length === 0 && !syncMayFill) {
     console.error('No accounts configured.\n');
     console.error('Add an account first:');
-    console.error('  teamclaude import           Import from Claude Code');
-    console.error('  teamclaude login            OAuth login via browser');
-    console.error('  teamclaude login --api      Add an API key (last resort by default; --priority <n>)');
-    console.error('  teamclaude callback login   Sign in to callback.net and take the accounts of your other installs');
+    console.error('  relaycrew import           Import from Claude Code');
+    console.error('  relaycrew login            OAuth login via browser');
+    console.error('  relaycrew login --api      Add an API key (last resort by default; --priority <n>)');
+    console.error('  relaycrew callback login   Sign in to callback.net and take the accounts of your other installs');
     process.exit(1);
   }
 
@@ -360,7 +360,7 @@ async function serverCommand() {
     console.error('No valid accounts after initialization');
     process.exit(1);
   }
-  if (syncMayFill) console.log('[TeamClaude] No accounts configured; signed in to callback.net, so the credential store will be checked for them');
+  if (syncMayFill) console.log('[RelayCrew] No accounts configured; signed in to callback.net, so the credential store will be checked for them');
 
   // `accounts[].models` (#74) is superseded by the `routes` table (#86). Routes
   // do the same job with glob matching, several accounts per rule and a bucket
@@ -372,7 +372,7 @@ async function serverCommand() {
   for (const acct of config.accounts) {
     if (!acct.models?.length) continue;
     const route = { name: acct.name, match: acct.models, accounts: [acct.name] };
-    console.error(`[TeamClaude] Deprecated: account "${acct.name}" uses "models" — replace it with a routes entry: ${JSON.stringify(route)}`);
+    console.error(`[RelayCrew] Deprecated: account "${acct.name}" uses "models" — replace it with a routes entry: ${JSON.stringify(route)}`);
   }
 
   const threshold = config.switchThreshold || 0.98;
@@ -380,12 +380,12 @@ async function serverCommand() {
   // in this block would not crash the router, it would make every adaptive
   // score NaN and silently fall through to even distribution, with nothing
   // pointing at the field that caused it. Checked whether or not the mode is
-  // on, so `teamclaude distribute adaptive` later cannot activate a bad block.
+  // on, so `relaycrew distribute adaptive` later cannot activate a bad block.
   let adaptive;
   try {
     adaptive = validateAdaptiveConfig(config.adaptiveDistribution);
   } catch (err) {
-    console.error(`[TeamClaude] Bad adaptiveDistribution setting in ${getConfigPath()}: ${err.message}`);
+    console.error(`[RelayCrew] Bad adaptiveDistribution setting in ${getConfigPath()}: ${err.message}`);
     process.exit(1);
   }
   const accountManager = new AccountManager(accounts, threshold, { routes: config.routes, ramp: config.stormRamp, distributeSessions: config.distributeSessions, expiryRouting: config.expiryRouting, advisorEligibility: config.advisorEligibility, adaptive, listener: localListener(config) });
@@ -398,7 +398,7 @@ async function serverCommand() {
   // state (passive — we never call the API to re-learn it). Stale windows are
   // cleared automatically on first use by _clearExpiredQuotas.
   const savedState = await loadState().catch(err => {
-    console.error(`[TeamClaude] Could not read saved state: ${err.message}`);
+    console.error(`[RelayCrew] Could not read saved state: ${err.message}`);
     return null;
   });
   if (savedState?.quota) accountManager.restoreQuotaState(savedState.quota);
@@ -417,7 +417,7 @@ async function serverCommand() {
   // Periodically persist quota (and once more on shutdown) to the state file.
   const persistQuotaState = () =>
     saveState({ quota: accountManager.exportQuotaState(), clients: clientUsage.exportState(), usageDimensions: dimensionUsage.exportState() })
-      .catch(err => console.error(`[TeamClaude] Failed to save quota state: ${err.message}`));
+      .catch(err => console.error(`[RelayCrew] Failed to save quota state: ${err.message}`));
   let quotaSaveInterval = null;
 
   // An account admitted from somewhere other than this install's config: the
@@ -431,7 +431,7 @@ async function serverCommand() {
     const idx = accountManager.addAccount(entry);
     atomicConfigUpdate((/** @type {any} */ diskConfig) => {
       if (!diskConfig.accounts.some((/** @type {any} */ a) => sameIdentity(a, entry))) diskConfig.accounts.push(entry);
-    }).catch((/** @type {any} */ err) => console.error(`[TeamClaude] Failed to save an account added from callback.net: ${err.message}`));
+    }).catch((/** @type {any} */ err) => console.error(`[RelayCrew] Failed to save an account added from callback.net: ${err.message}`));
     return idx;
   };
 
@@ -449,11 +449,11 @@ async function serverCommand() {
     }
     atomicConfigUpdate((/** @type {any} */ diskConfig) => {
       diskConfig.accounts = diskConfig.accounts.filter((/** @type {any} */ a) => (entryId ? a.id !== entryId : !sameIdentity(a, account)));
-    }).catch((/** @type {any} */ err) => console.error(`[TeamClaude] Failed to save the removal of "${account.name}": ${err.message}`));
+    }).catch((/** @type {any} */ err) => console.error(`[RelayCrew] Failed to save the removal of "${account.name}": ${err.message}`));
   };
 
   // Credential sync through callback.net: active only while this install is
-  // signed in (`teamclaude callback login`); dormant otherwise. Every token
+  // signed in (`relaycrew callback login`); dormant otherwise. Every token
   // refresh goes through its lock, every local token change is stored, a
   // removal here leaves a tombstone the other installs act on, and a pass at
   // start, on reload and daily brings the fleet level with the store.
@@ -466,7 +466,7 @@ async function serverCommand() {
   accountManager.onAccountError((account) => { credentialSync.onAccountError(account).catch(() => {}); });
 
   // Persist refreshed tokens back to config (re-read from disk to avoid clobbering
-  // accounts added externally, e.g. by `teamclaude import` while server is running)
+  // accounts added externally, e.g. by `relaycrew import` while server is running)
   accountManager.onTokenRefresh((idx, newTokens) => {
     const account = accountManager.accounts[idx];
     if (!account) return;
@@ -503,9 +503,9 @@ async function serverCommand() {
         // Said out loud: the account keeps serving on the new token, so nothing
         // else shows that the file still holds the old one until a restart
         // fails on it.
-        console.error(`[TeamClaude] Refreshed token for "${safeLine(account.name, 64)}" not saved: no row in ${getConfigPath()} carries its entry id`);
+        console.error(`[RelayCrew] Refreshed token for "${safeLine(account.name, 64)}" not saved: no row in ${getConfigPath()} carries its entry id`);
       }
-    }).catch(err => console.error(`[TeamClaude] Failed to save refreshed token: ${err.message}`));
+    }).catch(err => console.error(`[RelayCrew] Failed to save refreshed token: ${err.message}`));
     // And to the credential store, when signed in. Not awaited: the disk
     // write above is the one that must land; the store follows.
     credentialSync.onLocalTokens(idx, newTokens).catch(() => {});
@@ -513,7 +513,7 @@ async function serverCommand() {
   const port = config.proxy.port;
   // Bind loopback by default so the proxy isn't reachable off-box (it injects
   // account tokens and — via CONNECT — can relay arbitrarily). Opt into a wider
-  // bind explicitly with TEAMCLAUDE_HOST or config.proxy.host (e.g. '0.0.0.0'),
+  // bind explicitly with RELAYCREW_HOST or config.proxy.host (e.g. '0.0.0.0'),
   // in which case set proxy.apiKey so the auth gate protects remote clients.
   const bindHost = envVar('HOST') || config.proxy.host || '127.0.0.1';
   const headless = args.includes('--headless') || args.includes('--no-tui');
@@ -524,7 +524,7 @@ async function serverCommand() {
   // Opt-in keep-warm scheduler (interval or persisted reset-target schedule).
   let warmer = null;
   const serverStartedAt = Date.now();
-  // Read once here, not per request: `teamclaude update` swaps package.json on
+  // Read once here, not per request: `relaycrew update` swaps package.json on
   // disk while this process keeps running the old code, and status must report
   // what is running, not what is installed.
   const serverVersion = currentVersion();
@@ -548,23 +548,23 @@ async function serverCommand() {
   const sx = new SxManager({ log: line => console.error(line) });
   if (config.sx?.apiKey) {
     const r = await sx.configure(config.sx.apiKey, config.sx.mode);
-    if (!r.ok) console.error(`[TeamClaude] sx.org disabled: ${r.error}`);
+    if (!r.ok) console.error(`[RelayCrew] sx.org disabled: ${r.error}`);
   } else if (config.sx?.mode) {
     await sx.setMode(config.sx.mode);
   }
 
   // Re-sync accounts from disk without a restart. The TUI's 'R' key, the
-  // POST /teamclaude/reload endpoint, and the CLI notify after add/change all
+  // POST /relaycrew/reload endpoint, and the CLI notify after add/change all
   // funnel through here. Returns { added, removed }: accounts picked up from
   // disk and running accounts dropped because their entry is gone. Also picks
-  // up a changed probe interval so `teamclaude probe` applies live.
+  // up a changed probe interval so `relaycrew probe` applies live.
   const doReload = async () => {
     // With any id the file lacked written back: an account picked up here keeps
     // its entry's id, and its token writes find their row by it (#564).
     const diskConfig = await loadConfigPersistingIds();
     if (!diskConfig) return { added: 0, removed: 0 };
     const { added, removed } = await syncAccountsFromDisk(diskConfig, config, accountManager);
-    // `teamclaude callback login` notifies through a reload, so this is where a
+    // `relaycrew callback login` notifies through a reload, so this is where a
     // fresh sign-in brings the store's accounts in; the pass is also what makes
     // an import or login on this install reach the other ones.
     credentialSync.sync('reload').catch(() => {});
@@ -590,7 +590,7 @@ async function serverCommand() {
     // the endpoint to be off as surely as one who deletes the key, and leaving
     // the old mode in memory would keep it served.
     if (config.proxy) config.proxy.mcp = diskConfig.proxy?.mcp;
-    // Pick up route table edits (teamclaude route …, TUI editor, or a hand edit).
+    // Pick up route table edits (relaycrew route …, TUI editor, or a hand edit).
     config.routes = diskConfig.routes || [];
     accountManager.setRoutes(config.routes);
     // Pick up a distributeSessions change (hand edit or another writer) the same
@@ -599,7 +599,7 @@ async function serverCommand() {
     // it to plain even distribution on every config reload.
     config.distributeSessions = diskConfig.distributeSessions ?? false;
     accountManager.setDistributeSessions(config.distributeSessions);
-    // Pick up a switchThreshold change the same way (teamclaude threshold, the
+    // Pick up a switchThreshold change the same way (relaycrew threshold, the
     // TUI settings screen, or a hand edit). thresholdFor() reads it off the
     // manager on every decision, so assigning it is the whole application —
     // and without this a change from outside the TUI waited for a restart.
@@ -643,7 +643,7 @@ async function serverCommand() {
     // shouldStripOverageHeaders / shouldSynthesizeQuotaHeaders), so the reload
     // applies to subsequent requests.
     Object.assign(config, reloadedHeaderFlags(diskConfig));
-    // Apply an sx.org key/mode change made on disk (e.g. via POST /teamclaude/reload).
+    // Apply an sx.org key/mode change made on disk (e.g. via POST /relaycrew/reload).
     const diskSxKey = diskConfig.sx?.apiKey || null;
     const diskSxMode = diskConfig.sx?.mode || 'always';
     if (diskSxKey !== sx.apiKey || diskSxMode !== sx.mode) {
@@ -788,14 +788,14 @@ async function serverCommand() {
   if (!tui && activityLogPath) {
     // 0600, matching the request log and the config (see tui.js for why).
     const aStream = createWriteStream(activityLogPath, { flags: 'a', mode: 0o600 });
-    aStream.on('error', err => process.stderr.write(`[TeamClaude] activity log error: ${err.message}\n`));
+    aStream.on('error', err => process.stderr.write(`[RelayCrew] activity log error: ${err.message}\n`));
     const ts = () => new Date().toLocaleTimeString('en-US', { hour12: false });
     const writeActivity = msg => {
-      // Strip [TeamClaude] prefix to match TUI behaviour. Sanitized because a
+      // Strip [RelayCrew] prefix to match TUI behaviour. Sanitized because a
       // log line is one line: a value carrying a newline would otherwise write
       // a second entry that reads as genuine, and this file is what deployments
       // join against to attribute traffic to a person.
-      aStream.write(`${ts()}  ${sanitizeText(msg.replace(/^\[TeamClaude\]\s*/, ''))}\n`);
+      aStream.write(`${ts()}  ${sanitizeText(msg.replace(/^\[RelayCrew\]\s*/, ''))}\n`);
     };
     // Capture request completions via the hook
     const inFlight = new Map();
@@ -835,7 +835,7 @@ async function serverCommand() {
   hooks.reload = reloadAccounts;
   hooks.persistAccounts = () => atomicConfigUpdate(mergeAccountsOnto);
 
-  // Account controls for the dashboard's POST /teamclaude/{priority,disable}.
+  // Account controls for the dashboard's POST /relaycrew/{priority,disable}.
   // Written through atomicConfigUpdate under the config lock, so a concurrent
   // TUI edit cannot be clobbered and an op that throws leaves the file as it
   // was. The endpoint runs hooks.reload afterwards, which is what makes the
@@ -929,7 +929,7 @@ async function serverCommand() {
   // start is about to fail, and the server holding the port presents the
   // chain on disk.
   if (existsSync(caCertPath()) && !(await isProxyUp(port).catch(() => true))) {
-    await ensureCerts(mitmHosts(config)).catch((err) => console.error(`[TeamClaude] Could not renew the MITM certificate: ${err.message}`));
+    await ensureCerts(mitmHosts(config)).catch((err) => console.error(`[RelayCrew] Could not renew the MITM certificate: ${err.message}`));
   }
   const server = createProxyServer(accountManager, config, hooks, sx, clientUsage, dimensionUsage, { bindHost });
   // Catch bind-time errors (e.g. EADDRINUSE) only. Once the socket is bound we
@@ -942,18 +942,18 @@ async function serverCommand() {
     // Bind succeeded: stop treating errors as listen failures, but keep a
     // benign runtime handler so a later 'error' is logged rather than thrown.
     server.removeListener('error', onListenError);
-    server.on('error', err => console.error(`[TeamClaude] Server error: ${err.message}`));
+    server.on('error', err => console.error(`[RelayCrew] Server error: ${err.message}`));
     // Announce an egress proxy, especially one inherited from the environment:
     // it changes where every upstream byte goes, and a value nobody typed here
     // should never be in force silently.
     const egressProxy = getUpstreamProxy();
     if (egressProxy.proxy) {
       const via = egressProxy.source.startsWith('env:') ? ` (from ${egressProxy.source.slice(4)})` : '';
-      console.log(`[TeamClaude] Upstream proxy: ${describeProxy(egressProxy.proxy)}${via}`);
+      console.log(`[RelayCrew] Upstream proxy: ${describeProxy(egressProxy.proxy)}${via}`);
     } else if (egressProxy.source === 'self') {
-      // Almost always a shell that ran `eval "$(teamclaude env)"` before starting
+      // Almost always a shell that ran `eval "$(relaycrew env)"` before starting
       // the server. Silently going direct is right; saying nothing is not.
-      console.log(`[TeamClaude] Upstream proxy: direct — ${describeSelfProxy(egressProxy)}`);
+      console.log(`[RelayCrew] Upstream proxy: direct — ${describeSelfProxy(egressProxy)}`);
     }
     if (tui) {
       const held = earlyConsole?.release() ?? [];
@@ -968,7 +968,7 @@ async function serverCommand() {
       const sep = '='.repeat(60);
       console.log('');
       console.log(sep);
-      console.log('  TeamClaude Proxy');
+      console.log('  RelayCrew Proxy');
       console.log(sep);
       console.log(`  Bind:       ${bindHost}:${port}${bindHost === '127.0.0.1' ? ' (localhost only)' : ' (reachable off-box — ensure proxy.apiKey is set)'}`);
       console.log(`  Accounts:   ${accounts.length}`);
@@ -979,8 +979,8 @@ async function serverCommand() {
         console.log(`  [${i + 1}] ${a.name} (${a.type})`);
       });
       console.log('');
-      console.log('  Run Claude through proxy:  teamclaude run');
-      console.log('  Show env vars:             teamclaude env');
+      console.log('  Run Claude through proxy:  relaycrew run');
+      console.log('  Show env vars:             relaycrew env');
       console.log(sep);
       console.log('');
     }
@@ -1010,7 +1010,7 @@ async function serverCommand() {
   // like the config warnings in config-ops.js, rather than silently leaving a
   // budget unenforced.
   if (!(config.quotaProbeSeconds > 0) && accountManager.accounts.some(a => a.maxSpend != null)) {
-    console.error('[TeamClaude] accounts[].maxSpend is set but the quota probe is off (quotaProbeSeconds = 0) — the spend figure it is judged against is only refreshed by the probe, so the cap only binds after a manual `p` refresh; run `teamclaude probe <seconds>`');
+    console.error('[RelayCrew] accounts[].maxSpend is set but the quota probe is off (quotaProbeSeconds = 0) — the spend figure it is judged against is only refreshed by the probe, so the cap only binds after a manual `p` refresh; run `relaycrew probe <seconds>`');
   }
 
   // Start the opt-in keep-warm scheduler. Interval mode runs relative to server
@@ -1029,7 +1029,7 @@ async function serverCommand() {
 
   // Background self-update for a backgrounded (headless) server. Skipped under
   // the TUI, where npm's install output would corrupt the display — interactive
-  // users update via `teamclaude run` (post-session) or `teamclaude update`.
+  // users update via `relaycrew run` (post-session) or `relaycrew update`.
   // Not awaited, and nothing inside it is synchronous: the npm probe and the
   // install are child processes the loop runs beside (#353), so this never
   // holds up a request.
@@ -1047,7 +1047,7 @@ async function serverCommand() {
     shuttingDown = true;
     try { tui?.stop(); } catch { /* terminal already restored */ }
     stopTitle();
-    if (!tui) console.log('\n[TeamClaude] Shutting down...');
+    if (!tui) console.log('\n[RelayCrew] Shutting down...');
     prober?.stop();
     warmer?.stop();
     credentialSync.stop();
@@ -1122,7 +1122,7 @@ async function importCommand() {
 /**
  * The --routing flag: the account's own egress proxy URL
  * (http/socks4/socks4a/socks5/socks5h with optional user:pass auth, see
- * account-routing.js), or `none` for "no proxy", spelled as `teamclaude
+ * account-routing.js), or `none` for "no proxy", spelled as `relaycrew
  * routing <name> none` spells it. An invalid value is a hard CLI error: a typo
  * must not quietly add an account that goes direct.
  * @returns {{ given: boolean, routing: import('./account-routing.js').RoutingProxy|null }}
@@ -1233,7 +1233,7 @@ function noteUnusedRouting(entry, used) {
 }
 
 /**
- * `teamclaude login --codex` — browser OAuth against OpenAI, then store the
+ * `relaycrew login --codex` — browser OAuth against OpenAI, then store the
  * account.
  *
  * Deliberately simpler than the Anthropic path: that one calls the profile
@@ -1422,7 +1422,7 @@ async function loginApiCommand() {
   });
   console.log(`Added API key account "${name}" at priority ${priority}${routing ? ` (routed via ${describeRouting(routing)})` : ''}`);
   if (priority === APIKEY_DEFAULT_PRIORITY) {
-    console.log(`A last resort: the key serves only while every account ahead of it is spent, and rotation leaves it as soon as one of them has quota again. \`teamclaude priority ${name} 0\` rotates it like the others.`);
+    console.log(`A last resort: the key serves only while every account ahead of it is spent, and rotation leaves it as soon as one of them has quota again. \`relaycrew priority ${name} 0\` rotates it like the others.`);
   }
   console.log(`Saved to ${getConfigPath()}`);
   await notifyRunningServer(config);
@@ -1448,8 +1448,8 @@ async function loginOAuthCommand({ pasteOnly = false } = {}) {
     console.error(`OAuth login failed: ${sanitizeText(err?.message || err)}`);
     console.error('');
     console.error('Alternatives:');
-    console.error('  teamclaude import        Import from existing Claude Code credentials');
-    console.error('  teamclaude login --api   Add an API key instead');
+    console.error('  relaycrew import        Import from existing Claude Code credentials');
+    console.error('  relaycrew login --api   Add an API key instead');
     process.exit(1);
   }
 
@@ -1458,8 +1458,8 @@ async function loginOAuthCommand({ pasteOnly = false } = {}) {
 
 // ── env ─────────────────────────────────────────────────────
 
-// `teamclaude env [--no-mitm]` — print the export lines that point Claude Code
-// at the proxy, for `eval "$(teamclaude env)"`. Mirrors `teamclaude run`'s
+// `relaycrew env [--no-mitm]` — print the export lines that point Claude Code
+// at the proxy, for `eval "$(relaycrew env)"`. Mirrors `relaycrew run`'s
 // environment (MITM forward-proxy by default; --no-mitm for base-URL only) so a
 // tool that spawns claude itself — an agent multiplexer, a CI job, a manual
 // shell — gets the same routing without going through `run`. Only the export
@@ -1467,10 +1467,10 @@ async function loginOAuthCommand({ pasteOnly = false } = {}) {
 async function envCommand() {
   // Use loadConfig (not loadOrCreateConfig): a query command must never write to
   // stdout — creating a config prints "Created config at …", which would poison
-  // `eval "$(teamclaude env)"` — nor silently create config as a side effect.
+  // `eval "$(relaycrew env)"` — nor silently create config as a side effect.
   const config = await loadConfig();
   if (!config) {
-    process.stderr.write(`No config found at ${getConfigPath()}. Add an account first: teamclaude login\n`);
+    process.stderr.write(`No config found at ${getConfigPath()}. Add an account first: relaycrew login\n`);
     process.exit(1);
   }
   const port = config.proxy.port;
@@ -1478,7 +1478,7 @@ async function envCommand() {
   try {
     useMitm = resolveClientMode(config, args.slice(1)) === 'mitm';
   } catch (/** @type {any} */ err) {
-    process.stderr.write(`teamclaude env: ${err.message}\n`);
+    process.stderr.write(`relaycrew env: ${err.message}\n`);
     process.exit(1);
   }
 
@@ -1492,7 +1492,7 @@ async function envCommand() {
   // a second provider fails the handshake instead of being served.
   if (useMitm) ({ caPath, renewal } = await ensureCerts(mitmHosts(config), { keep: proxyUp }));
 
-  // Same pin as `teamclaude run`, so `eval "$(teamclaude env)"` and `run` agree.
+  // Same pin as `relaycrew run`, so `eval "$(relaycrew env)"` and `run` agree.
   const account = (process.env.TC_ACCT || '').trim();
   let lines;
   try {
@@ -1508,13 +1508,13 @@ async function envCommand() {
     if (!useMitm) lines.push(...clearSelfProxyEnvLines(port));
   } catch (err) {
     // A bad proxy.port. Nothing reaches stdout: the shell is eval'ing it.
-    process.stderr.write(`teamclaude env: ${err.message} (in ${getConfigPath()})\n`);
+    process.stderr.write(`relaycrew env: ${err.message} (in ${getConfigPath()})\n`);
     process.exit(1);
   }
   process.stdout.write(`${lines.join('\n')}\n`);
 
   const mode = useMitm ? 'MITM forward-proxy' : 'base-URL';
-  process.stderr.write(`# TeamClaude env: ${mode} mode, localhost:${port}\n`);
+  process.stderr.write(`# RelayCrew env: ${mode} mode, localhost:${port}\n`);
   if (account) {
     process.stderr.write(`# pinned to account "${account}" (TC_ACCT)\n`);
     // Warn, don't fail: the account list can change before the shell is used,
@@ -1524,13 +1524,13 @@ async function envCommand() {
     }
   }
   // The flag that reproduces this mode whatever the config's default says.
-  process.stderr.write(`# apply to this shell:  eval "$(teamclaude env${useMitm ? ' --mitm' : ' --no-mitm'})"\n`);
+  process.stderr.write(`# apply to this shell:  eval "$(relaycrew env${useMitm ? ' --mitm' : ' --no-mitm'})"\n`);
   process.stderr.write(`# default mode is ${config.defaultClientMode === 'base-url' ? 'base-URL' : 'MITM'} (config defaultClientMode; the TUI settings screen toggles it)\n`);
   if (renewal) {
     process.stderr.write(`# warning: the MITM certificate ${renewal}. The running proxy presents it, so it is kept; restart the proxy to renew it\n`);
   }
   if (!proxyUp) {
-    process.stderr.write(`# note: proxy not running on port ${port} — start it with: teamclaude server\n`);
+    process.stderr.write(`# note: proxy not running on port ${port} — start it with: relaycrew server\n`);
   }
   if (config.proxy?.apiKey) {
     process.stderr.write(`# remote (non-loopback) clients must also present the proxy key: ANTHROPIC_API_KEY=<proxy.apiKey> (base-URL), or http://<key>@host:${port} (MITM)\n`);
@@ -1542,7 +1542,7 @@ async function envCommand() {
 async function runCommand() {
   const config = await loadOrCreateConfig();
 
-  // Args after 'run'. teamclaude flags (e.g. --no-mitm) are recognized only
+  // Args after 'run'. relaycrew flags (e.g. --no-mitm) are recognized only
   // before an optional `--` separator; everything after `--` goes verbatim to
   // claude. MITM forward-proxy mode is the default so hardcoded api.anthropic.com
   // endpoints are intercepted too; the config's `defaultClientMode` can make
@@ -1554,7 +1554,7 @@ async function runCommand() {
   try {
     useMitm = resolveClientMode(config, tcFlags) === 'mitm';
   } catch (/** @type {any} */ err) {
-    console.error(`[TeamClaude] ${err.message}`);
+    console.error(`[RelayCrew] ${err.message}`);
     process.exit(1);
   }
   const autoFallback = tcFlags.includes('--auto-fallback');
@@ -1568,7 +1568,7 @@ async function runCommand() {
   // opt back into the transparent direct launch (e.g. for a dumb shell alias).
   const port = config.proxy.port;
   const env = { ...process.env };
-  // TC_ACCT pins this session to one account, in either mode. It is teamclaude's
+  // TC_ACCT pins this session to one account, in either mode. It is relaycrew's
   // own knob, so it never reaches the child: claude has no use for it, and an
   // account name is not something to leak into a subprocess environment that
   // gets inherited by every tool and MCP server claude spawns.
@@ -1586,7 +1586,7 @@ async function runCommand() {
       // The proxy is up, so the stored chain is the one it presents: kept even
       // when it falls short, since a new one would come with a new CA.
       const { caPath, renewal } = await ensureCerts(mitmHosts(config), { keep: true });
-      if (renewal) console.error(`[TeamClaude] The MITM certificate ${renewal}. The running proxy presents it, so it is kept; restart the proxy to renew it.`);
+      if (renewal) console.error(`[RelayCrew] The MITM certificate ${renewal}. The running proxy presents it, so it is kept; restart the proxy to renew it.`);
       // The pin rides in the proxy URL's userinfo, which the client forwards as
       // `Proxy-Authorization: Basic <acct>:<key>` on each CONNECT — the only pin
       // channel an HTTPS_PROXY env var can express. The password slot keeps the
@@ -1602,13 +1602,13 @@ async function runCommand() {
       const inheritedNoProxy = [process.env.NO_PROXY, process.env.no_proxy];
       env.NO_PROXY = env.no_proxy = mergeNoProxy(...inheritedNoProxy);
       if (inheritedNoProxy.some(bypassesAllHosts)) {
-        console.error('[TeamClaude] NO_PROXY=* ignored: it would send api.anthropic.com around the proxy (no rotation). Use --no-mitm for a direct launch.');
+        console.error('[RelayCrew] NO_PROXY=* ignored: it would send api.anthropic.com around the proxy (no rotation). Use --no-mitm for a direct launch.');
       }
       env.NODE_EXTRA_CA_CERTS = caPath;
-      if (tcAcct) console.error(`[TeamClaude] Pinned to account "${tcAcct}" (TC_ACCT)`);
+      if (tcAcct) console.error(`[RelayCrew] Pinned to account "${tcAcct}" (TC_ACCT)`);
       else if (pinnedBase) {
-        console.error('[TeamClaude] Account pin in ANTHROPIC_BASE_URL ignored: MITM mode does not use a base URL.');
-        console.error('[TeamClaude] Use TC_ACCT=<account> instead — it pins in both modes.');
+        console.error('[RelayCrew] Account pin in ANTHROPIC_BASE_URL ignored: MITM mode does not use a base URL.');
+        console.error('[RelayCrew] Use TC_ACCT=<account> instead — it pins in both modes.');
       }
       delete env.ANTHROPIC_BASE_URL;
     } else {
@@ -1616,21 +1616,21 @@ async function runCommand() {
       // Only set ANTHROPIC_BASE_URL — Claude Code keeps its own OAuth token
       // which the proxy accepts from localhost. Not setting ANTHROPIC_API_KEY
       // lets Claude Code stay in subscription mode (full model access).
-      // TC_ACCT wins; teamclaude builds the pinned URL itself rather than making
+      // TC_ACCT wins; relaycrew builds the pinned URL itself rather than making
       // the caller hand-write one. Otherwise an existing /tc-acct/ base URL
       // pointing at this proxy is preserved for configs written against 1.1.10.
       if (tcAcct) {
         env.ANTHROPIC_BASE_URL = `http://localhost:${port}/tc-acct/${encodePinComponent(tcAcct)}`;
-        console.error(`[TeamClaude] Pinned to account "${tcAcct}" (TC_ACCT)`);
+        console.error(`[RelayCrew] Pinned to account "${tcAcct}" (TC_ACCT)`);
       } else if (!pinnedBase) {
         env.ANTHROPIC_BASE_URL = `http://localhost:${port}`;
       }
     }
   } else if (autoFallback) {
-    console.error(`[TeamClaude] Proxy not running on port ${port} — launching claude directly (--auto-fallback; start it with: teamclaude server)`);
+    console.error(`[RelayCrew] Proxy not running on port ${port} — launching claude directly (--auto-fallback; start it with: relaycrew server)`);
   } else {
-    console.error(`[TeamClaude] Proxy not running on port ${port}.`);
-    console.error('Start it with: teamclaude server');
+    console.error(`[RelayCrew] Proxy not running on port ${port}.`);
+    console.error('Start it with: relaycrew server');
     console.error('Or pass --auto-fallback to launch claude directly (bypassing the proxy) when it is down.');
     process.exit(1);
   }
@@ -1674,10 +1674,10 @@ async function runCommand() {
   // stale local login is the shape of that failure, not proof of it.
   if (result.status && Date.now() - startedAt < LOCAL_LOGIN_HINT_WINDOW_MS && !env.ANTHROPIC_API_KEY && !env.CLAUDE_CODE_OAUTH_TOKEN) {
     const hint = await localLoginHint({ read: importCredentials, expired: isTokenExpired });
-    if (hint) console.error(`[TeamClaude] ${hint}`);
+    if (hint) console.error(`[RelayCrew] ${hint}`);
   }
 
-  // Session over — check for a newer teamclaude and (for a global npm install)
+  // Session over — check for a newer relaycrew and (for a global npm install)
   // self-update. Throttled to once/day, so this is a no-op on almost every run;
   // it applies to the NEXT launch, never the session that just ran.
   await autoUpdate({ config }).catch(() => {});
@@ -1703,7 +1703,7 @@ function writeStdout(text) {
 
 async function statusCommand() {
   const config = await loadOrCreateConfig();
-  const url = `http://localhost:${config.proxy.port}/teamclaude/status`;
+  const url = `http://localhost:${config.proxy.port}/relaycrew/status`;
   const json = args.includes('--json');
   const colorArg = argValue('--color') || args.find(arg => arg.startsWith('--color='))?.slice('--color='.length);
   const color = colorArg === 'always'
@@ -1734,7 +1734,7 @@ async function statusCommand() {
       process.exit(1);
     }
     console.error('Cannot connect to proxy at localhost:' + config.proxy.port);
-    console.error('Is the server running? Start with: teamclaude server');
+    console.error('Is the server running? Start with: relaycrew server');
     if (err?.message) console.error(`Details: ${err.message}`);
     process.exit(1);
   }
@@ -1759,7 +1759,7 @@ async function attachCommand() {
   // Checked before connecting: the dashboard needs raw-mode input, and failing
   // on that after a successful poll would be a confusing order to report it in.
   if (!process.stdin.isTTY) {
-    console.error('teamclaude attach needs a terminal. For a one-shot readout use: teamclaude status');
+    console.error('relaycrew attach needs a terminal. For a one-shot readout use: relaycrew status');
     process.exit(1);
   }
 
@@ -1769,7 +1769,7 @@ async function attachCommand() {
     first = await control.status(); // fail here, with a usable message, not inside the TUI
   } catch (err) {
     console.error(`Cannot connect to proxy at ${host}:${port}`);
-    console.error('Is the server running? Start with: teamclaude server');
+    console.error('Is the server running? Start with: relaycrew server');
     if (err?.message) console.error(`Details: ${err.message}`);
     process.exit(1);
   }
@@ -1786,16 +1786,16 @@ async function attachCommand() {
 // Open the browser dashboard against a running server. The page is served by
 // the proxy itself, so this is `attach` for the browser: it does not start a
 // server. A background daemon started from here would run with no log and no
-// supervisor, which is what `teamclaude service install` exists to avoid.
+// supervisor, which is what `relaycrew service install` exists to avoid.
 async function dashboardCommand() {
   const config = await loadOrCreateConfig();
   const port = config.proxy.port;
   const bound = envVar('HOST') || config.proxy.host || '127.0.0.1';
   const host = (bound === '0.0.0.0' || bound === '::') ? '127.0.0.1' : bound;
-  const dashboardUrl = `http://${host}:${port}/teamclaude/dashboard`;
+  const dashboardUrl = `http://${host}:${port}/relaycrew/dashboard`;
   if (!(await isProxyUp(port))) {
-    console.error(`[TeamClaude] Proxy not running on port ${port}.`);
-    console.error('Start it with: teamclaude server   (or: teamclaude service install)');
+    console.error(`[RelayCrew] Proxy not running on port ${port}.`);
+    console.error('Start it with: relaycrew server   (or: relaycrew service install)');
     process.exit(1);
   }
 
@@ -1827,14 +1827,14 @@ async function switchCommand() {
 
   try {
     if (!name) {
-      const res = await fetch(`http://localhost:${port}/teamclaude/status`, { headers });
+      const res = await fetch(`http://localhost:${port}/relaycrew/status`, { headers });
       // Something answered on the port. Whether it is our proxy is a separate
       // question, and getting it wrong would blame a down server for a reply we
       // simply could not read — or report an unreadable reply as an empty fleet.
       const data = res.ok ? await res.json().catch(() => null) : null;
       if (!data || !Array.isArray(data.accounts)) {
         console.error(`Unexpected reply from localhost:${port} (HTTP ${res.status}) — no account list in it.`);
-        console.error('Something is listening there, but it does not answer like this teamclaude version.');
+        console.error('Something is listening there, but it does not answer like this relaycrew version.');
         process.exit(1);
       }
       if (!data.accounts.length) {
@@ -1848,11 +1848,11 @@ async function switchCommand() {
         const state = a.disabled ? 'disabled' : (a.status && a.status !== 'active' ? a.status : null);
         console.log(`${a.name === data.currentAccount ? '*' : ' '} ${a.name}${state ? `  (${state})` : ''}`);
       }
-      console.log('\nSwitch with: teamclaude switch <name>');
+      console.log('\nSwitch with: relaycrew switch <name>');
       return;
     }
 
-    const res = await fetch(`http://localhost:${port}/teamclaude/switch`, {
+    const res = await fetch(`http://localhost:${port}/relaycrew/switch`, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify({ account: name }),
@@ -1880,18 +1880,18 @@ async function switchCommand() {
     // Run from inside a Claude Code session (a `!` command, a tool), this is
     // easy to mistake for moving just that session (#543).
     if (process.env.CLAUDE_CODE_SESSION_ID) {
-      console.log(`This moved every session that is not pinned. To move only this one: teamclaude switch ${/^[\w.@+-]+$/.test(name) ? name : JSON.stringify(name)} --session`);
+      console.log(`This moved every session that is not pinned. To move only this one: relaycrew switch ${/^[\w.@+-]+$/.test(name) ? name : JSON.stringify(name)} --session`);
     }
   } catch (err) {
     console.error('Cannot connect to proxy at localhost:' + port);
-    console.error('Is the server running? Start with: teamclaude server');
+    console.error('Is the server running? Start with: relaycrew server');
     if (err?.message) console.error(`Details: ${err.message}`);
     process.exit(1);
   }
 }
 
 /**
- * `teamclaude switch <account> --session [<id>]`: hold one client session on an
+ * `relaycrew switch <account> --session [<id>]`: hold one client session on an
  * account, leaving the rest of the fleet alone (#543). `--clear` drops the pin.
  * The id defaults to $CLAUDE_CODE_SESSION_ID, which Claude Code exports to the
  * commands it runs, so from inside a session the flag alone names it.
@@ -1909,20 +1909,20 @@ async function switchSessionCommand(port, headers, name) {
     process.exit(1);
   }
   if (!clear && !name) {
-    console.error('Usage: teamclaude switch <account> --session [<id>]   (or: teamclaude switch --session [<id>] --clear)');
+    console.error('Usage: relaycrew switch <account> --session [<id>]   (or: relaycrew switch --session [<id>] --clear)');
     process.exit(1);
   }
   const shown = sessionId.slice(0, 8);
   let res;
   try {
-    res = await fetch(`http://localhost:${port}/teamclaude/session-pin`, {
+    res = await fetch(`http://localhost:${port}/relaycrew/session-pin`, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId, account: clear ? null : name }),
     });
   } catch (/** @type {any} */ err) {
     console.error('Cannot connect to proxy at localhost:' + port);
-    console.error('Is the server running? Start with: teamclaude server');
+    console.error('Is the server running? Start with: relaycrew server');
     if (err?.message) console.error(`Details: ${err.message}`);
     process.exit(1);
   }
@@ -1950,7 +1950,7 @@ async function switchSessionCommand(port, headers, name) {
   // session may not go through the proxy at all.
   if (data.seen === false) {
     console.error(`Warning: the proxy has not seen a request from session ${shown} in the last hour. The pin applies once one arrives;`
-      + ' if this session does not run through teamclaude, or sends a different session id, it never will.');
+      + ' if this session does not run through relaycrew, or sends a different session id, it never will.');
   }
 }
 
@@ -1962,7 +1962,7 @@ async function accountsCommand() {
 
   if (config.accounts.length === 0) {
     console.log('No accounts configured.');
-    console.log('Add one with: teamclaude import, teamclaude login, or teamclaude login --api');
+    console.log('Add one with: relaycrew import, relaycrew login, or relaycrew login --api');
     return;
   }
 
@@ -2121,8 +2121,8 @@ async function apiCommand() {
   const path = args[1];
 
   if (!path) {
-    console.error('Usage: teamclaude api <path> [--account NAME] [--method POST] [--data JSON]');
-    console.error('Example: teamclaude api /api/oauth/claude_cli/roles');
+    console.error('Usage: relaycrew api <path> [--account NAME] [--method POST] [--data JSON]');
+    console.error('Example: relaycrew api /api/oauth/claude_cli/roles');
     process.exit(1);
   }
 
@@ -2198,12 +2198,12 @@ async function serviceCommand() {
   const sub = args[1] || 'status';
   const kind = serviceKind();
   if (!kind) {
-    console.error(`teamclaude service: no service integration for ${process.platform}`);
-    console.error('Run the proxy yourself with: teamclaude server --headless');
+    console.error(`relaycrew service: no service integration for ${process.platform}`);
+    console.error('Run the proxy yourself with: relaycrew server --headless');
     process.exit(1);
   }
   // Carry an explicit config path into the unit: a service started by launchd or
-  // systemd does not inherit the shell's TEAMCLAUDE_CONFIG, so a non-default
+  // systemd does not inherit the shell's RELAYCREW_CONFIG, so a non-default
   // config would silently be ignored and the service would serve a different
   // (or empty) account list than the CLI does.
   const configPath = envVar('CONFIG') || null;
@@ -2211,12 +2211,12 @@ async function serviceCommand() {
   switch (sub) {
     case 'install': {
       const res = await installService({ configPath });
-      if (!res.ok) { console.error(`teamclaude service install failed: ${res.error}`); process.exit(1); }
+      if (!res.ok) { console.error(`relaycrew service install failed: ${res.error}`); process.exit(1); }
       break;
     }
     case 'uninstall': {
       const res = await uninstallService();
-      if (!res.ok) { console.error(`teamclaude service uninstall failed: ${res.error}`); process.exit(1); }
+      if (!res.ok) { console.error(`relaycrew service uninstall failed: ${res.error}`); process.exit(1); }
       break;
     }
     case 'print':
@@ -2227,11 +2227,11 @@ async function serviceCommand() {
       console.log(`Service:   ${s.installed ? s.file : 'not installed'}`);
       console.log(`State:     ${s.running ? `running${s.pid ? ` (pid ${s.pid})` : ''}` : s.detail}`);
       if (kind === 'launchd') console.log(`Logs:      ${logPath()}`);
-      else console.log('Logs:      journalctl --user --unit teamclaude.service');
+      else console.log('Logs:      journalctl --user --unit relaycrew.service');
       break;
     }
     default:
-      console.error('Usage: teamclaude service <install|uninstall|status|print>');
+      console.error('Usage: relaycrew service <install|uninstall|status|print>');
       process.exit(1);
   }
 }
@@ -2245,7 +2245,7 @@ async function probeCommand() {
   if (arg === undefined) {
     const cur = config.quotaProbeSeconds || 0;
     console.log(cur > 0 ? `Quota probe: every ${cur}s` : 'Quota probe: off (passive only)');
-    console.log('Set with: teamclaude probe <off|seconds>   e.g. teamclaude probe 300');
+    console.log('Set with: relaycrew probe <off|seconds>   e.g. relaycrew probe 300');
     return;
   }
 
@@ -2255,7 +2255,7 @@ async function probeCommand() {
   } else {
     seconds = parseInt(arg, 10);
     if (Number.isNaN(seconds) || seconds < 0) {
-      console.error('Usage: teamclaude probe <off|seconds>');
+      console.error('Usage: relaycrew probe <off|seconds>');
       process.exit(1);
     }
   }
@@ -2281,9 +2281,9 @@ async function warmupCommand() {
     }
     const cur = config.warmupSeconds || 0;
     console.log(cur > 0 ? `Keep-warm: every ${cur}s` : 'Keep-warm: off');
-    console.log('Set with: teamclaude warmup <off|seconds>');
-    console.log('          teamclaude warmup reset HH:MM --timezone Area/City');
-    console.log('          teamclaude warmup rolling HH:MM --timezone Area/City');
+    console.log('Set with: relaycrew warmup <off|seconds>');
+    console.log('          relaycrew warmup reset HH:MM --timezone Area/City');
+    console.log('          relaycrew warmup rolling HH:MM --timezone Area/City');
     console.log('Note: warming spawns a minimal `claude` per idle account and DOES spend a little quota');
     console.log('(unlike the passive quota probe). It only warms accounts whose 5h window is idle.');
     return;
@@ -2294,7 +2294,7 @@ async function warmupCommand() {
     const timezoneFlag = args.indexOf('--timezone', 3);
     const timezone = timezoneFlag >= 0 ? args[timezoneFlag + 1] : null;
     if (!resetTime || !timezone || args.length !== 5 || timezoneFlag !== 3) {
-      console.error(`Usage: teamclaude warmup ${arg} HH:MM --timezone Area/City`);
+      console.error(`Usage: relaycrew warmup ${arg} HH:MM --timezone Area/City`);
       process.exit(1);
     }
     applyOrExit(() => setWarmupSchedule(config, arg, { resetTime, timezone }));
@@ -2310,7 +2310,7 @@ async function warmupCommand() {
   } else {
     seconds = parseInt(arg, 10);
     if (Number.isNaN(seconds) || seconds < 0) {
-      console.error('Usage: teamclaude warmup <off|seconds>');
+      console.error('Usage: relaycrew warmup <off|seconds>');
       process.exit(1);
     }
   }
@@ -2341,8 +2341,8 @@ async function thresholdCommand() {
 
   if (!rest.length) {
     printThresholds(config.switchThreshold);
-    console.log('Set with: teamclaude threshold <1-100>   e.g. teamclaude threshold 90');
-    console.log('Per bucket: teamclaude threshold unified7d=90   (=default drops it again)');
+    console.log('Set with: relaycrew threshold <1-100>   e.g. relaycrew threshold 90');
+    console.log('Per bucket: relaycrew threshold unified7d=90   (=default drops it again)');
     return;
   }
 
@@ -2403,7 +2403,7 @@ async function distributeCommand() {
 
   if (arg === undefined) {
     console.log(`Session distribution: ${current}`);
-    console.log('Set with: teamclaude distribute <on|off|adaptive>');
+    console.log('Set with: relaycrew distribute <on|off|adaptive>');
     console.log('On: each session stays on its account for cache reuse, and new sessions spread');
     console.log('across equal-priority accounts by load. Off: quota-driven rotation only.');
     console.log('Adaptive: spread by remaining weekly credit and load rather than evenly, so the');
@@ -2449,7 +2449,7 @@ async function callbackCommand() {
       try {
         const me = await callbackWhoami();
         console.log(`Already signed in to callback.net as ${describeCallbackUser(me)}.`);
-        console.log('Run `teamclaude callback logout` first, or pass --force to sign in again.');
+        console.log('Run `relaycrew callback logout` first, or pass --force to sign in again.');
         return;
       } catch (/** @type {any} */ err) {
         // A session the server no longer honours is replaced; anything else
@@ -2462,7 +2462,7 @@ async function callbackCommand() {
       }
     }
     if (!callbackClientId()) {
-      console.error('No callback.net client id is configured. Set TEAMROUTER_CALLBACK_CLIENT_ID to the OAuth2 app id to sign in as.');
+      console.error('No callback.net client id is configured. Set RELAYCREW_CALLBACK_CLIENT_ID to the OAuth2 app id to sign in as.');
       process.exit(1);
     }
     let token;
@@ -2501,8 +2501,8 @@ async function callbackCommand() {
     } catch (/** @type {any} */ err) {
       if (err?.loginRequired) {
         console.error((await loadCallbackToken())
-          ? 'The callback.net session has expired. Run `teamclaude callback login`.'
-          : 'Not signed in to callback.net. Run `teamclaude callback login`.');
+          ? 'The callback.net session has expired. Run `relaycrew callback login`.'
+          : 'Not signed in to callback.net. Run `relaycrew callback login`.');
       } else {
         console.error(`Could not reach callback.net: ${err?.message || err}`);
       }
@@ -2532,7 +2532,7 @@ async function callbackCommand() {
     let status = null;
     for (let i = 0; i < 20 && !status?.callbackSync?.lastSyncAt && !status?.callbackSync?.lastError; i++) {
       await new Promise(resolve => setTimeout(resolve, 500));
-      status = await fetch(`http://localhost:${config.proxy.port}/teamclaude/status`, { headers: { 'x-api-key': config.proxy.apiKey }, signal: AbortSignal.timeout(5_000) })
+      status = await fetch(`http://localhost:${config.proxy.port}/relaycrew/status`, { headers: { 'x-api-key': config.proxy.apiKey }, signal: AbortSignal.timeout(5_000) })
         .then(r => r.json()).catch(() => null);
     }
     const s = status?.callbackSync;
@@ -2575,7 +2575,7 @@ async function updateCommand() {
   console.log(`Updating ${info.current} → ${info.latest} …`);
   const ok = await runUpdate(info.latest);
   if (ok) {
-    console.log(`Updated to ${info.latest}. Restart teamclaude to use the new version.`);
+    console.log(`Updated to ${info.latest}. Restart relaycrew to use the new version.`);
   } else {
     console.error(`Update failed. Try manually: npm install -g ${PKG_NAME}@latest`);
     process.exitCode = 1;
@@ -2608,7 +2608,7 @@ async function removeCommand() {
   const name = args[1];
 
   if (!name) {
-    console.error('Usage: teamclaude remove <account-name|email> [--org <name|uuid>]');
+    console.error('Usage: relaycrew remove <account-name|email> [--org <name|uuid>]');
     process.exit(1);
   }
 
@@ -2688,8 +2688,8 @@ async function priorityCommand() {
   const name = args[1];
 
   if (!name) {
-    console.error('Usage: teamclaude priority <account-name|email> <n> [--org <name|uuid>]');
-    console.error('       teamclaude priority <account-name|email> --first | --last');
+    console.error('Usage: relaycrew priority <account-name|email> <n> [--org <name|uuid>]');
+    console.error('       relaycrew priority <account-name|email> --first | --last');
     console.error('Lower priority is preferred for rotation (default 0).');
     process.exit(1);
   }
@@ -2730,7 +2730,7 @@ async function renameCommand() {
   const newName = args[2];
 
   if (!name || !newName || newName.startsWith('--')) {
-    console.error('Usage: teamclaude rename <account-name|email> <new-name> [--org <name|uuid>]');
+    console.error('Usage: relaycrew rename <account-name|email> <new-name> [--org <name|uuid>]');
     process.exit(1);
   }
 
@@ -2749,7 +2749,7 @@ async function setDisabledCommand(disabled) {
   const verb = disabled ? 'disable' : 'enable';
 
   if (!name) {
-    console.error(`Usage: teamclaude ${verb} <account-name|email> [--org <name|uuid>]`);
+    console.error(`Usage: relaycrew ${verb} <account-name|email> [--org <name|uuid>]`);
     process.exit(1);
   }
 
@@ -2842,10 +2842,10 @@ async function routingCommand() {
 // ── help ────────────────────────────────────────────────────
 
 function showHelp() {
-  console.log('Team administration: teamclaude team --help\n');
-  console.log(`TeamClaude - Multi-account Claude proxy
+  console.log('Team administration: relaycrew team --help\n');
+  console.log(`RelayCrew - Multi-account Claude proxy
 
-Usage: teamclaude [command] [options]
+Usage: relaycrew [command] [options]
 
 Commands:
   server              Start the proxy server (default; --headless to skip the TUI)
@@ -2858,10 +2858,10 @@ Commands:
                       --priority <n> to place it, 0 = level with the rest)
   env [--mitm|--no-mitm]
                       Print export lines to point Claude Code at the proxy, for
-                      'eval "$(teamclaude env)"'. MITM forward-proxy unless the
+                      'eval "$(relaycrew env)"'. MITM forward-proxy unless the
                       config's defaultClientMode is "base-url"; a flag decides
                       per call. Handy for agent multiplexers that spawn claude
-                      themselves instead of via 'teamclaude run'
+                      themselves instead of via 'relaycrew run'
   run [--no-mitm] [--auto-fallback] [-- args...]
                       Run Claude Code through the proxy (errors if it's down,
                       unless --auto-fallback launches claude directly instead).
@@ -2921,7 +2921,7 @@ Commands:
   callback status     Show who is signed in to callback.net
   callback sync       Reconcile the running server with the store now
   callback logout     Revoke that session and forget it
-  update              Check npm for a newer teamclaude and install it
+  update              Check npm for a newer relaycrew and install it
   version             Print the installed version
   help                Show this help
 
@@ -2951,35 +2951,34 @@ Environment:
   TC_ACCT             Pin a session to ONE account, bypassing rotation. Works in
                       both modes. Accepts accountUuid, orgUuid,
                       accountUuid/orgUuid, or a display name/email:
-                        TC_ACCT=me@example.com teamclaude run
+                        TC_ACCT=me@example.com relaycrew run
                       Prefer a UUID for anything scripted: display names are
                       rewritten when an email gains a second org. Read by 'run'
                       and 'env', then removed from the environment so it never
                       reaches claude or the tools it spawns. An unknown account
                       is refused rather than silently rotated.
-  TEAMCLAUDE_CONFIG   Path to the config file (default below)
-  TEAMCLAUDE_DISABLE_AUTOUPDATE=1
+  RELAYCREW_CONFIG   Path to the config file (default below)
+  RELAYCREW_DISABLE_AUTOUPDATE=1
                       Skip the background self-update check
-  Every TEAMCLAUDE_* variable is also read as TEAMROUTER_*, which wins when
-  both are set: the project is being renamed to TeamRouter, and 'teamrouter'
-  already runs this same CLI. See github.com/KarpelesLab/teamclaude/issues/72.
+  Legacy TEAMROUTER_* and TEAMCLAUDE_* variables remain accepted.
+  RELAYCREW_* takes precedence when multiple spellings are set.
 
 The server always accepts both base-URL and proxy/CONNECT clients, so instances
 launched with and without --no-mitm can share one server.
 
-A running server re-syncs accounts from config on POST /teamclaude/reload
+A running server re-syncs accounts from config on POST /relaycrew/reload
 (local only). add/login/enable/disable/priority trigger it automatically.
-POST /teamclaude/switch {"account": "<name>"} makes one account the preferred
-one, which is what 'teamclaude switch' calls.
+POST /relaycrew/switch {"account": "<name>"} makes one account the preferred
+one, which is what 'relaycrew switch' calls.
 
 MCP endpoint (off by default). With "proxy": { "mcp": "read" } the server
-serves its status, quota and settings as MCP tools at /teamclaude/mcp; "full"
+serves its status, quota and settings as MCP tools at /relaycrew/mcp; "full"
 adds the tools that change them (switch, enable/disable, priority, remove,
 threshold, distribute, probe, warmup, routes, routing, blocked models, client
 mode).
 Connect Claude Code with:
-  claude mcp add --transport http teamclaude http://localhost:3456/teamclaude/mcp
-Same gates as the other /teamclaude/ routes. A named client key is served
+  claude mcp add --transport http relaycrew http://localhost:3456/relaycrew/mcp
+Same gates as the other /relaycrew/ routes. A named client key is served
 read-only even in "full" mode: the write tools answer to the shared proxy key
 and to local callers. With no proxy key configured, only local callers are served.
 
@@ -2994,7 +2993,7 @@ and from sx.org (a specific residential-egress provider with its own policy).
 
 Per-account routing. One account can have its own egress proxy instead: set
 "routing": "socks5h://user:pass@host:1080" on the account, or run
-'teamclaude routing <name> <url>', or pass --routing to login/import. Every
+'relaycrew routing <name> <url>', or pass --routing to login/import. Every
 connection for that account — forwarding, token refresh, profile, usage and
 quota — tunnels through that proxy with TLS end to end; no other account is
 affected, and the account bypasses both the fleet upstream proxy and sx (its
@@ -3017,10 +3016,10 @@ them) pins those. Held requests wait up to holdSeconds (default 120), then get a
 503. See config.example.json.
 
 A global npm install self-updates in the background (checked once/day, applied
-on the next launch). Disable with TEAMCLAUDE_DISABLE_AUTOUPDATE=1 or
+on the next launch). Disable with RELAYCREW_DISABLE_AUTOUPDATE=1 or
 "autoUpdate": false in the config.
 
-Config: ${getConfigPath()} (a ~/.config/teamrouter.json is used when it exists)
+Config: ${getConfigPath()} (existing legacy config files are reused)
 Crash log: ${getCrashLogPath()} (server; written when the process dies unexpectedly)
 `);
 }
@@ -3073,7 +3072,7 @@ async function upsertOAuthAccount(name, creds, source = 'unknown', routing = nul
     // it is not a way past a token the upstream refused: suggesting it there
     // would be pointing at the one door this no longer opens.
     const advice = isTokenRejection(profile)
-      ? 'The upstream rejected this token and it could not be refreshed. Run `teamclaude login` to get a fresh one.'
+      ? 'The upstream rejected this token and it could not be refreshed. Run `relaycrew login` to get a fresh one.'
       : 'Retry with valid credentials, or pass --name to add the account without profile detection.';
     // The TUI shows one line per event, so the advice rides along in the message.
     if (!fatal) throw new Error(`${why}. ${advice}`);
@@ -3253,10 +3252,10 @@ function applyOrExit(change) {
   }
 }
 
-// Keep the terminal title in sync with the active account (e.g. "teamclaude 2/4
-// work") so a backgrounded or tabbed `teamclaude server` is glanceable. TTY-only
+// Keep the terminal title in sync with the active account (e.g. "relaycrew 2/4
+// work") so a backgrounded or tabbed `relaycrew server` is glanceable. TTY-only
 // — never emit escapes into a pipe, a `--log-to` redirect, or a systemd journal;
-// opt out entirely with TEAMCLAUDE_NO_TITLE. Polls (rather than hooking every
+// opt out entirely with RELAYCREW_NO_TITLE. Polls (rather than hooking every
 // currentIndex mutation) and writes only when the title actually changes.
 // Returns an idempotent stop() that restores the shell's previous title.
 function startTerminalTitleUpdater(accountManager) {
@@ -3297,7 +3296,7 @@ async function notifyRunningServer(config) {
   const port = config?.proxy?.port;
   if (!port) return;
   try {
-    const res = await fetch(`http://localhost:${port}/teamclaude/reload`, {
+    const res = await fetch(`http://localhost:${port}/relaycrew/reload`, {
       method: 'POST',
       headers: { 'x-api-key': config.proxy?.apiKey || '' },
       signal: AbortSignal.timeout(1500),
@@ -3330,15 +3329,15 @@ function isProxyUp(port, timeout = 600) {
 
 function handleServerListenError(err, port) {
   if (err.code === 'EADDRINUSE') {
-    console.error(`[TeamClaude] Port ${port} is already in use.`);
-    console.error('Another TeamClaude proxy may already be running.');
-    console.error('Check the existing server with: teamclaude status');
+    console.error(`[RelayCrew] Port ${port} is already in use.`);
+    console.error('Another RelayCrew proxy may already be running.');
+    console.error('Check the existing server with: relaycrew status');
     console.error(`Find the listener with: lsof -nP -iTCP:${port} -sTCP:LISTEN`);
   } else if (err.code === 'EACCES') {
-    console.error(`[TeamClaude] Permission denied while listening on port ${port}.`);
-    console.error('Choose a non-privileged port in the TeamClaude config.');
+    console.error(`[RelayCrew] Permission denied while listening on port ${port}.`);
+    console.error('Choose a non-privileged port in the RelayCrew config.');
   } else {
-    console.error(`[TeamClaude] Failed to listen on port ${port}: ${err.message}`);
+    console.error(`[RelayCrew] Failed to listen on port ${port}: ${err.message}`);
   }
   process.exit(1);
 }

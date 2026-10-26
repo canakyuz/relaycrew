@@ -1,10 +1,11 @@
 {
-  "name": "@sep1ol/teamclaude",
+  "name": "@sep1ol/relaycrew",
   "version": "1.2.0-team.1",
   "description": "Self-hosted team gateway for Claude Code and Codex with individual credentials, account grants, and concurrency limits",
   "type": "module",
   "main": "src/index.js",
   "bin": {
+    "relaycrew": "src/index.js",
     "teamclaude": "src/index.js",
     "teamrouter": "src/index.js"
   },

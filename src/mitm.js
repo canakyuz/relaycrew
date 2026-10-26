@@ -1,6 +1,6 @@
 // MITM forward-proxy support: local cert lifecycle + terminating CONNECT proxy.
 //
-// When a claude instance is launched with HTTPS_PROXY pointed at teamclaude it
+// When a claude instance is launched with HTTPS_PROXY pointed at relaycrew it
 // sends `CONNECT api.anthropic.com:443`. Rather than byte-relaying the tunnel, we
 // TERMINATE it with a real Node HTTP/2 server (allowHTTP1, so an h1 client works
 // too) presenting our locally-minted leaf, then forward each request with a
@@ -14,6 +14,7 @@
 
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { X509Certificate } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import net from 'node:net';
 import tls from 'node:tls';
@@ -27,9 +28,9 @@ import { forwardRefusal, guardedLookup, FORBIDDEN_FORWARD } from './forward-targ
 import { safeLine } from './safe-text.js';
 /** @typedef {import('./types.js').CodedError} CodedError */
 
-const CA_CERT = 'teamclaude-ca.pem';
-const LEAF_CERT = 'teamclaude-leaf.pem';
-const LEAF_KEY = 'teamclaude-leaf.key';
+const CA_CERT = 'relaycrew-ca.pem';
+const LEAF_CERT = 'relaycrew-leaf.pem';
+const LEAF_KEY = 'relaycrew-leaf.key';
 
 // A built-in host the MITM proxy always intercepts and answers itself (never
 // forwarded upstream). Lets you verify the proxy + CA end-to-end with no
@@ -38,7 +39,15 @@ const LEAF_KEY = 'teamclaude-leaf.key';
 export const TEST_HOST = 'www.example.org';
 
 const certDir = () => dirname(getConfigPath());
-const fpath = (n) => join(certDir(), n);
+const fpath = (n) => {
+  const dir = certDir();
+  for (const name of ['relaycrew', 'teamrouter', 'teamclaude']) {
+    if (['-ca.pem', '-leaf.pem', '-leaf.key'].every(suffix => existsSync(join(dir, name + suffix)))) {
+      return join(dir, n.replace('relaycrew', name));
+    }
+  }
+  return join(dir, n);
+};
 
 /** Path to the CA cert clients should trust via NODE_EXTRA_CA_CERTS. */
 export function caCertPath() {
@@ -109,7 +118,7 @@ export function leafCovers(caCertPem, leafCertPem, hosts, now = Date.now()) {
  * which only authenticates as `host` to a process that already trusts our CA.
  *
  * `keep` is for a caller that hands the CA to a client while a proxy is
- * running (`teamclaude env` and `run`). The running proxy presents the leaf it
+ * running (`relaycrew env` and `run`). The running proxy presents the leaf it
  * read from these files, and a regenerated chain always comes with a new CA,
  * since the old CA's key is gone. Replacing the files then gave every client
  * launched afterwards a CA the proxy's leaf is not signed by, and each one
@@ -170,7 +179,7 @@ export function hostMode(host, config) {
   // In terminal-only mode the MITM must never terminate ChatGPT Desktop's
   // connection. Terminal Codex uses the explicit /backend-api/codex base URL;
   // this host-level bypass keeps Desktop's native auth and feature endpoints
-  // outside TeamClaude entirely.
+  // outside RelayCrew entirely.
   if (config?.proxy?.terminalOnly === true && host === 'chatgpt.com') return 'tunnel';
   if (host === upstreamHostOf(config)) return 'rewrite';
   // A second provider's host, and only when an account actually uses that
@@ -323,7 +332,7 @@ export function createConnectHandler({ config, accountManager, ensureLeaf, logDi
         }
         const target = upgradeUpstreamFor(req.headers.host, config, upstream);
         if (!target) {
-          log(`[TeamClaude] MITM: refusing a WebSocket Upgrade for host ${JSON.stringify(safeLine(req.headers.host, 64))}, which this proxy does not intercept`);
+          log(`[RelayCrew] MITM: refusing a WebSocket Upgrade for host ${JSON.stringify(safeLine(req.headers.host, 64))}, which this proxy does not intercept`);
           try { socket.write('HTTP/1.1 421 Misdirected Request\r\nConnection: close\r\n\r\n'); } catch { /* client already gone */ }
           socket.destroy();
           return;
@@ -337,7 +346,7 @@ export function createConnectHandler({ config, accountManager, ensureLeaf, logDi
         // Control channel, which is the client's own and still relayed.
         const wsProvider = providerForPath(req.url);
         if (wsProvider !== DEFAULT_PROVIDER) {
-          log(`[TeamClaude] MITM: refusing a ${wsProvider} WebSocket for ${safeLine(req.url, 96)} — it would run on the client's own login, not the pool; the client falls back to HTTPS`);
+          log(`[RelayCrew] MITM: refusing a ${wsProvider} WebSocket for ${safeLine(req.url, 96)} — it would run on the client's own login, not the pool; the client falls back to HTTPS`);
           try { socket.write('HTTP/1.1 501 Not Implemented\r\nConnection: close\r\n\r\n'); } catch { /* client already gone */ }
           socket.destroy();
           return;
@@ -346,7 +355,7 @@ export function createConnectHandler({ config, accountManager, ensureLeaf, logDi
         // so the channel is attributed the way the requests in the tunnel are.
         relayUpgrade(req, socket, head, target, sx, { client, clientUsage, log, stripOverage: shouldStripOverageHeaders(config) });
       } catch (err) {
-        log(`[TeamClaude] MITM: WebSocket upgrade handler failed for ${safeLine(req?.url)}: ${err?.message || err}`);
+        log(`[RelayCrew] MITM: WebSocket upgrade handler failed for ${safeLine(req?.url)}: ${err?.message || err}`);
         try { socket.write('HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n'); } catch { /* client already gone */ }
         socket.destroy();
       }
@@ -357,13 +366,13 @@ export function createConnectHandler({ config, accountManager, ensureLeaf, logDi
     if (!http1Only) {
       srv.on('stream', (stream, headers) => {
         if (headers[':method'] === 'CONNECT' || headers[':protocol']) {
-          log('[TeamClaude] A client tried to open a WebSocket over HTTP/2, which this proxy cannot relay. '
+          log('[RelayCrew] A client tried to open a WebSocket over HTTP/2, which this proxy cannot relay. '
             + 'Remote Control will appear connected and silently deliver nothing. '
             + 'Set "mitm": { "http1Only": true } in the config to force HTTP/1.1 (see #164).');
         }
       });
     }
-    srv.on('sessionError', (e) => log(`[TeamClaude] MITM session error: ${e.message}`));
+    srv.on('sessionError', (e) => log(`[RelayCrew] MITM session error: ${e.message}`));
     srv.on('clientError', (e, sock) => { try { sock.destroy(); } catch { /* already gone */ } });
     return srv;
     })().catch((err) => {
@@ -390,7 +399,7 @@ export function createConnectHandler({ config, accountManager, ensureLeaf, logDi
     const auth = resolveConnectAuth(req, clientSocket, config.proxy);
     if (!auth.ok) {
       try {
-        clientSocket.write('HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic realm="teamclaude"\r\nConnection: close\r\n\r\n');
+        clientSocket.write('HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic realm="relaycrew"\r\nConnection: close\r\n\r\n');
       } catch { /* client already gone */ }
       clientSocket.destroy();
       return;
@@ -418,7 +427,7 @@ export function createConnectHandler({ config, accountManager, ensureLeaf, logDi
       // in the lookup below so a DNS alias for 127.0.0.1 does not get past.
       const refused = forwardRefusal(host, null, clientSocket);
       if (refused) {
-        log(`[TeamClaude] CONNECT ${host}:${port} refused: ${refused}`);
+        log(`[RelayCrew] CONNECT ${host}:${port} refused: ${refused}`);
         refuseRaw(clientSocket, '403 Forbidden');
         return;
       }
@@ -450,7 +459,7 @@ export function createConnectHandler({ config, accountManager, ensureLeaf, logDi
         const refusedAfter = forwardRefusal(host, up.remoteAddress, clientSocket)
           || (up.remotePort === ownPort && up.localAddress === up.remoteAddress ? 'that is this proxy\'s own listener' : null);
         if (refusedAfter) {
-          log(`[TeamClaude] CONNECT ${host}:${port} refused: ${refusedAfter}`);
+          log(`[RelayCrew] CONNECT ${host}:${port} refused: ${refusedAfter}`);
           teardown('403 Forbidden');
           return;
         }
@@ -461,11 +470,11 @@ export function createConnectHandler({ config, accountManager, ensureLeaf, logDi
       });
       up.on('error', (/** @type {CodedError} */ err) => {
         if (err.code === FORBIDDEN_FORWARD) {
-          log(`[TeamClaude] CONNECT ${host}:${port} refused: ${err.message}`);
+          log(`[RelayCrew] CONNECT ${host}:${port} refused: ${err.message}`);
           teardown('403 Forbidden');
           return;
         }
-        if (!established) log(`[TeamClaude] tunnel ${host}:${port} failed: ${describeConnectError(err)}`);
+        if (!established) log(`[RelayCrew] tunnel ${host}:${port} failed: ${describeConnectError(err)}`);
         teardown('502 Bad Gateway');
       });
       // A FIN before the tunnel is live (no preceding 'error') is still a failed
@@ -481,7 +490,7 @@ export function createConnectHandler({ config, accountManager, ensureLeaf, logDi
       ensureLeaf().then(({ key, cert }) => {
         reply200Raw(clientSocket);
         serveTest(termClaude(clientSocket, head, key, cert, ['http/1.1']));
-      }).catch((err) => { log(`[TeamClaude] MITM ${host}: ${err.message}`); reply502Raw(clientSocket); clientSocket.destroy(); });
+      }).catch((err) => { log(`[RelayCrew] MITM ${host}: ${err.message}`); reply502Raw(clientSocket); clientSocket.destroy(); });
       return;
     }
 
@@ -497,9 +506,9 @@ export function createConnectHandler({ config, accountManager, ensureLeaf, logDi
     // down unrelated traffic over a typo meant for Anthropic.
     const { pin, error } = resolveConnectPin(req, accountManager, config.proxy);
     if (error) {
-      log(`[TeamClaude] CONNECT ${host}: ${error}`);
+      log(`[RelayCrew] CONNECT ${host}: ${error}`);
       try {
-        clientSocket.write(`HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic realm="teamclaude"\r\nConnection: close\r\n\r\n`);
+        clientSocket.write(`HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic realm="relaycrew"\r\nConnection: close\r\n\r\n`);
       } catch { /* client already gone */ }
       clientSocket.destroy();
       return;
@@ -509,13 +518,13 @@ export function createConnectHandler({ config, accountManager, ensureLeaf, logDi
       reply200Raw(clientSocket);
       if (head && head.length) clientSocket.unshift(head);
       srv.emit('connection', clientSocket);
-    }).catch((err) => { log(`[TeamClaude] MITM ${host}: ${err.message}`); reply502Raw(clientSocket); clientSocket.destroy(); });
+    }).catch((err) => { log(`[RelayCrew] MITM ${host}: ${err.message}`); reply502Raw(clientSocket); clientSocket.destroy(); });
   };
 }
 
 // The Basic username from a CONNECT's `Proxy-Authorization`, or null. This is
 // the only pin channel expressible in an HTTPS_PROXY URL, which is what
-// `teamclaude run` has to work with in MITM mode (there is no request path to
+// `relaycrew run` has to work with in MITM mode (there is no request path to
 // carry a `/tc-acct/` prefix — inside the tunnel the path is the real upstream
 // one). Clients send this preemptively on every CONNECT.
 export function connectPinToken(req) {
@@ -647,7 +656,7 @@ function serveTest(tlsSock) {
     tlsSock.removeListener('data', onData);
     const reqLine = buf.subarray(0, buf.indexOf('\r\n')).toString('latin1');
     const path = reqLine.split(' ')[1] || '/';
-    const body = JSON.stringify({ teamclaude: 'mitm-proxy-ok', host: TEST_HOST, path });
+    const body = JSON.stringify({ relaycrew: 'mitm-proxy-ok', host: TEST_HOST, path });
     tlsSock.end(
       `HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: ${Buffer.byteLength(body)}\r\nconnection: close\r\n\r\n${body}`,
     );

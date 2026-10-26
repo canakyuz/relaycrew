@@ -269,7 +269,7 @@ test('renderStatus prints configured usage dimensions and sanitizes their labels
   const status = sampleStatus();
   status.usageDimensions = {
     project: {
-      'KarpelesLab/teamclaude': { requests: 2, inputTokens: 1000, outputTokens: 250, lastUsed: '2026-07-03T11:59:00Z' },
+      'sep1ol/relaycrew': { requests: 2, inputTokens: 1000, outputTokens: 250, lastUsed: '2026-07-03T11:59:00Z' },
     },
     'bad\x1b[31mname': {
       'value\nred': { requests: 1, inputTokens: 1, outputTokens: 1 },
@@ -278,7 +278,7 @@ test('renderStatus prints configured usage dimensions and sanitizes their labels
 
   const output = renderStatus(status, { color: false, now });
   assert.match(output, /Project usage/);
-  assert.match(output, /KarpelesLab\/teamclaude\s+2 req, 1.0k in \/ 250 out, last 1m ago/);
+  assert.match(output, /sep1ol\/relaycrew\s+2 req, 1.0k in \/ 250 out, last 1m ago/);
   assert.match(output, /Bad name usage/);
   assert.match(output, /value red/);
   assert.doesNotMatch(output, /\x1b\[31m/);
@@ -565,7 +565,7 @@ test('adaptive diagnostics name the next target, score weight, and family split'
 
 // The adaptive rows come off the wire like everything else. An older server
 // omits fields and a hostile one sends strings where numbers belong; neither
-// may throw inside `teamclaude status` or reach the terminal unstripped.
+// may throw inside `relaycrew status` or reach the terminal unstripped.
 test('a hostile adaptive row renders as ? fields, not a throw or an escape', () => {
   const CLIP = '\x1b]52;c;aGVsbG8=\x07';
   const s = distributedStatus('adaptive');
@@ -608,7 +608,7 @@ test('accounts are listed in priority order, not config order', () => {
 });
 
 // Every account and route string in the payload can have come off the wire
-// (`teamclaude status` against a running server) or out of an OAuth reply, and
+// (`relaycrew status` against a running server) or out of an OAuth reply, and
 // the output is printed straight to the operator's terminal.
 test('renderStatus strips control characters out of account and route strings', () => {
   const CLIP = '\x1b]52;c;aGVsbG8=\x07';
