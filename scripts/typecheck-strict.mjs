@@ -9,12 +9,12 @@
 // any file has more now than it had there, or when a file the base did not
 // have carries any at all.
 //
-//   npm run typecheck:strict                  base = merge-base with origin/master
+//   npm run typecheck:strict                  base = merge-base with origin/main
 //   npm run typecheck:strict -- --base <ref>  base = that commit
 //
 // CI passes the pre-merge commit: for a pull request the checkout is already
-// the merge of the branch into master and the base is master's tip, so the two
-// counts are exactly "before this merge" and "after it"; for a push to master
+// the merge of the branch into main and the base is main's tip, so the two
+// counts are exactly "before this merge" and "after it"; for a push to main
 // the base is the previous tip. Per file rather than one total, so a change
 // cannot add diagnostics in one place by removing some in another. A rename is
 // followed (`git diff -M`), so a file carries its count to its new name.
@@ -60,7 +60,7 @@ function countAt(dir) {
   return counts;
 }
 
-const base = baseArg || git('merge-base', 'HEAD', 'origin/master');
+const base = baseArg || git('merge-base', 'HEAD', 'origin/main');
 const baseSha = git('rev-parse', '--verify', `${base}^{commit}`);
 
 // Renames between base and now, old path -> new path, so a moved file is
