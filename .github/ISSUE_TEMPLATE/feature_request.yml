@@ -1,0 +1,28 @@
+name: Feature request
+description: Propose a concrete improvement to this community fork.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For questions or early ideas, start a [Discussion](https://github.com/sep1ol/relaycrew/discussions).
+        Do not include credentials, private account details, or private request data.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: Describe what you are trying to do and what gets in the way.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Describe the behavior you want and who would use it.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Include a workaround or another approach, if you have one.

@@ -1,8 +1,8 @@
-# TeamClaude for teams
+# RelayCrew
 
 Self-hosted gateway for Claude Code and Codex. Run one gateway on a VPS, keep provider credentials on the server, and issue each developer an individually revocable gateway key.
 
-This community fork is maintained at [sep1ol/teamclaude](https://github.com/sep1ol/teamclaude). It retains the MIT license and history of [KarpelesLab/teamclaude](https://github.com/KarpelesLab/teamclaude). The upstream project targets individual use. This fork adds an explicit team access boundary.
+This community fork is maintained at [sep1ol/relaycrew](https://github.com/sep1ol/relaycrew). It retains the MIT license and history of [KarpelesLab/teamclaude](https://github.com/KarpelesLab/teamclaude). The upstream project targets individual use. This fork adds an explicit team access boundary.
 
 ## What team mode provides
 
@@ -21,8 +21,8 @@ The default individual mode remains compatible with upstream. Team mode requires
 Node.js 20 or newer is required. No runtime dependencies are needed.
 
 ```sh
-git clone https://github.com/sep1ol/teamclaude.git
-cd teamclaude
+git clone https://github.com/sep1ol/relaycrew.git
+cd relaycrew
 git switch main
 node src/index.js team init
 node src/index.js login
@@ -70,4 +70,10 @@ Run one gateway replica. Member concurrency is enforced per process. Usage stati
 
 Members can use pooled HTTP inference, directly or inside managed MITM tunnels. Arbitrary forwarding, Remote Control, and WebSocket relays are administrator-only. Team mode disables the implicit localhost trust exemption. The static dashboard HTML remains public; its fleet data requires the administrator key.
 
-The package metadata uses `@sep1ol/teamclaude`. This repository does not claim an npm release. Install from source or build the included Dockerfile. Automatic npm publishing requires a manually triggered workflow and publisher configuration.
+The repository is named RelayCrew. The CLI command remains `teamclaude` and package metadata uses `@sep1ol/teamclaude`. This repository does not claim an npm release. Install from source or build the included Dockerfile. Automatic npm publishing requires a manually triggered workflow and publisher configuration.
+
+## Contribute
+
+Start with the [contribution guide](CONTRIBUTING.md). Documentation fixes, bug reproductions, compatibility reports, tests, and code reviews all help. Look for [good first issues](https://github.com/sep1ol/relaycrew/labels/good%20first%20issue) or [help wanted](https://github.com/sep1ol/relaycrew/labels/help%20wanted).
+
+Use [Discussions](https://github.com/sep1ol/relaycrew/discussions) for questions and early ideas. The [support guide](SUPPORT.md) explains where to report problems. Pull requests use the repository template and require review and CI. See the [maintainer process](MAINTAINERS.md) and [code of conduct](CODE_OF_CONDUCT.md).

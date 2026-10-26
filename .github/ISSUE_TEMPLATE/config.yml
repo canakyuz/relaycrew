@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and discussions
+    url: https://github.com/sep1ol/relaycrew/discussions
+    about: Ask setup questions, compare approaches, or discuss an early idea.
+  - name: Report a vulnerability privately
+    url: https://github.com/sep1ol/relaycrew/security/advisories/new
+    about: Report credential exposure, authorization bypasses, or other security vulnerabilities without a public issue.
