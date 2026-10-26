@@ -22,6 +22,8 @@ import { isRoutingFailure, describeRouting } from './account-routing.js';
 import { safeLine } from './safe-text.js';
 import { forwardRefusal, guardedLookup, FORBIDDEN_FORWARD } from './forward-target.js';
 import { renderDashboardHtml, dashboardCsp } from './dashboard.js';
+import { handleTeamRequest } from './team-api.js';
+import { handleUsageHistoryRequest } from './usage-history.js';
 import { createUsageRecorder, resolveUsageDimensions, usageDimensionHeaderNames } from './client-usage.js';
 import { responsesEventUsage, isResponsesBody, normalizeResponsesUsage } from './responses-usage.js';
 import { classificationPath } from './classification-path.js';
@@ -479,6 +481,8 @@ export function createProxyServer(accountManager, config, hooks = {}, sx = null,
     try {
       const canonicalUrl = canonicalControlUrl(req.url);
       if (canonicalUrl) req.url = canonicalUrl;
+      const controlClass = classificationPath(req.url);
+      if (/^\/(?:relaycrew|teamclaude|teamrouter)\/(?:team(?:\/|$)|usage\/history$)/.test(controlClass)) res.setHeader('Cache-Control', 'no-store');
 
       // Dashboard page — served BEFORE the auth gate on purpose. The page is a
       // static asset containing no data: everything it shows comes from
@@ -546,7 +550,7 @@ export function createProxyServer(accountManager, config, hooks = {}, sx = null,
       // requirement, which would also close the hole but would break the
       // documented `curl -X POST .../relaycrew/reload` that sends no body.
       const crossOrigin = !isSameOriginControlRequest(req);
-      if (crossOrigin && req.method === 'POST' && (req.url || '').startsWith('/relaycrew/')) {
+      if (crossOrigin && req.method === 'POST' && isControlPath(classificationPath(req.url))) {
         res.writeHead(403, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           ok: false,
@@ -616,6 +620,9 @@ export function createProxyServer(accountManager, config, hooks = {}, sx = null,
         }
       }
 
+      if (await handleTeamRequest(req, res, { config, hooks, clientUsage, readBody: readControlBody })) return;
+      if (await handleUsageHistoryRequest(req, res, { config, clientUsage, dimensionUsage })) return;
+
       // Status endpoint
       if (req.method === 'GET' && req.url === '/relaycrew/status') {
         const status = accountManager.getStatus({ sessionDetail: config.proxy?.sessionDetail === true });
@@ -623,7 +630,7 @@ export function createProxyServer(accountManager, config, hooks = {}, sx = null,
         res.writeHead(200, { 'Content-Type': 'application/json' });
         // Counters only: how full the upstream admission gate is (see
         // upstream-fetch.js), never which origins or requests.
-        res.end(JSON.stringify({ ...extra, ...status, caller: callerView(req.tcClient), upstreamPool: upstreamPoolStatus() }, null, 2));
+        res.end(JSON.stringify({ ...extra, ...status, caller: callerView(req.tcClient), configuredUsageDimensions: (config.proxy?.usageDimensions ?? []).map((/** @type {{name: string}} */ dimension) => dimension.name), upstreamPool: upstreamPoolStatus() }, null, 2));
         return;
       }
 

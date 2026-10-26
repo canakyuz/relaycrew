@@ -1,6 +1,6 @@
-import { randomBytes } from 'node:crypto';
 import { atomicConfigUpdate, getConfigPath, loadConfig, loadConfigPersistingIds } from './config.js';
 import { providerOf } from './provider.js';
+import { applyTeamAction, configuredMembers, validateName } from './team-config.js';
 
 /**
  * @typedef {{ name: string, key: string, accounts: string[]|'*', maxConcurrent: number, disabled?: boolean }} TeamMember
@@ -9,7 +9,6 @@ import { providerOf } from './provider.js';
  *   { action: 'add', name: string, accounts: string[]|'*', maxConcurrent: number }} TeamAction
  */
 
-const MEMBER_NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;
 const USAGE = [
   'Usage: relaycrew team init',
   '       relaycrew team accounts',
@@ -20,13 +19,6 @@ const USAGE = [
   '',
   'Use stable IDs from team accounts. Quote "*" to explicitly grant every account.',
 ].join('\n');
-
-/** @param {unknown} name */
-function validateName(name) {
-  if (typeof name !== 'string' || !MEMBER_NAME.test(name)) {
-    throw new Error('Member names must be 1-64 letters, digits, underscores, dots or hyphens, starting with a letter or digit.');
-  }
-}
 
 /** @param {string[]} args @returns {TeamAction} */
 function parseCommand(args) {
@@ -65,47 +57,6 @@ function parseCommand(args) {
     throw new Error('--max-concurrent must be an integer from 1 to 1024.');
   }
   return { action, name, accounts, maxConcurrent };
-}
-
-/** @param {unknown} grants @param {Set<string>} [accountIds] */
-function validateGrants(grants, accountIds) {
-  if (grants === '*') return;
-  if (!Array.isArray(grants) || grants.some(id => typeof id !== 'string' || !id || id === '*') || new Set(grants).size !== grants.length) {
-    throw new Error('Each member needs explicit account IDs or accounts: "*". Review proxy.clientKeys in the protected config file.');
-  }
-  if (accountIds && grants.some(id => !accountIds.has(id))) {
-    throw new Error('An account grant does not match a configured stable ID. Run team accounts to list IDs.');
-  }
-}
-
-/** @param {Record<string, any>} config @returns {TeamMember[]} */
-function configuredMembers(config) {
-  const entries = config.proxy?.clientKeys ?? [];
-  if (!Array.isArray(entries)) throw new Error('proxy.clientKeys must be an array. Review the protected config file.');
-  const names = new Set();
-  const keys = new Set();
-  for (const entry of entries) {
-    if (!entry || typeof entry !== 'object') throw new Error('Invalid member entry. Review proxy.clientKeys in the protected config file.');
-    validateName(entry.name);
-    if (names.has(entry.name)) throw new Error('Duplicate member name. Review proxy.clientKeys in the protected config file.');
-    if (typeof entry.key !== 'string' || !entry.key.trim() || /\s|[\x00-\x1f\x7f]/.test(entry.key)) {
-      throw new Error('Each member needs a non-empty key without whitespace or control characters.');
-    }
-    if (keys.has(entry.key) || entry.key === config.proxy?.apiKey) {
-      throw new Error('Duplicate member key or member/admin key collision. Review the protected config file.');
-    }
-    validateGrants(entry.accounts);
-    const limit = entry.maxConcurrent ?? 4;
-    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1024) throw new Error('Member maxConcurrent must be a positive integer.');
-    if (entry.disabled !== undefined && typeof entry.disabled !== 'boolean') throw new Error('Member disabled must be true or false.');
-    names.add(entry.name);
-    keys.add(entry.key);
-  }
-  return entries;
-}
-
-function newKey() {
-  return 'tc-' + randomBytes(32).toString('base64url');
 }
 
 /** @param {Record<string, any>} config */
@@ -164,35 +115,7 @@ export async function teamCommand(args) {
 
     let issuedKey;
     const config = await atomicConfigUpdate((/** @type {Record<string, any>} */ disk) => {
-      const members = configuredMembers(disk);
-      if (command.action === 'init') {
-        const accountIds = new Set(disk.accounts.map((/** @type {{id: string}} */ account) => account.id));
-        for (const member of members) validateGrants(member.accounts, accountIds);
-        disk.proxy ??= {};
-        disk.proxy.clientKeys ??= [];
-        const adminKey = disk.proxy.apiKey;
-        if (typeof adminKey !== 'string' || adminKey.length < 32 || /\s|[\x00-\x1f\x7f]/.test(adminKey)) disk.proxy.apiKey = newKey();
-        disk.proxy.teamMode = true;
-        disk.proxy.trustLoopback = false;
-        disk.autoUpdate = false;
-        for (const member of members) member.maxConcurrent ??= 4;
-        return;
-      }
-      if (disk.proxy?.teamMode !== true) throw new Error('Team mode is not enabled. Run team init first.');
-      if (command.action === 'add') {
-        if (members.some(member => member.name === command.name)) throw new Error(`Member "${command.name}" already exists.`);
-        validateGrants(command.accounts, new Set(disk.accounts.map((/** @type {{id: string}} */ account) => account.id)));
-        issuedKey = newKey();
-        disk.proxy.clientKeys = [...members, { name: command.name, key: issuedKey, accounts: command.accounts, maxConcurrent: command.maxConcurrent }];
-        return;
-      }
-      const member = members.find(entry => entry.name === command.name);
-      if (!member) throw new Error(`Member "${command.name}" not found.`);
-      if (command.action === 'revoke') member.disabled = true;
-      else {
-        issuedKey = newKey();
-        member.key = issuedKey;
-      }
+      ({ issuedKey } = applyTeamAction(disk, command));
     });
 
     if (command.action === 'init') {

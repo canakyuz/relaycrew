@@ -1,5 +1,5 @@
 import { readFile, open, mkdir, chmod, rename, unlink, realpath } from 'node:fs/promises';
-import { openSync, writeSync, closeSync, readFileSync, statSync, existsSync } from 'node:fs';
+import { openSync, writeSync, closeSync, readFileSync, statSync, existsSync, unlinkSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';
 import { randomBytes } from 'node:crypto';
@@ -194,13 +194,12 @@ export async function loadOrCreateConfig() {
 //
 //   path     <configPath>.lock
 //   acquire  open(O_CREAT|O_EXCL, 0600), then write {"pid":<pid>,"at":<ms epoch>}
-//   stale    `at` older than 10 s, or the pid no longer alive: unlink and retry
-//   busy     poll every 25 ms for at most 2 s, then write WITHOUT the lock
+//   stale    dead pid, or malformed lock older than 10 s: unlink and retry
+//   busy     poll every 25 ms for at most 2 s, then refuse the write
 //   release  unlink
 //
-// The 2 s cap is deliberate: a writer must never hang on a lock, so contention
-// past it degrades to today's behaviour (a possible lost update) plus one
-// warning line, rather than to a stuck server or CLI.
+// The bounded wait prevents stuck writers. Contention fails closed: tokens and
+// team credentials must never be written without the shared lock.
 const LOCK_STALE_MS = 10_000;
 const LOCK_WAIT_MS = 2_000;
 const LOCK_POLL_MS = 25;
@@ -214,21 +213,43 @@ function lockWaitMs() {
 }
 
 function lockIsStale(lockPath) {
-  let pid, at;
+  let pid;
   try {
-    ({ pid, at } = JSON.parse(readFileSync(lockPath, 'utf8')));
+    ({ pid } = JSON.parse(readFileSync(lockPath, 'utf8')));
   } catch (err) {
     if (err.code === 'ENOENT') return false; // released under us; the retry takes it
     // Empty or garbled: the holder is between its open and its write, or died
     // there. Only the file's age can tell those apart.
     try { return Date.now() - statSync(lockPath).mtimeMs > LOCK_STALE_MS; } catch { return false; }
   }
-  if (Date.now() - at > LOCK_STALE_MS) return true;
-  if (!Number.isInteger(pid) || pid <= 0) return false;
+  if (!Number.isInteger(pid) || pid <= 0) {
+    try { return Date.now() - statSync(lockPath).mtimeMs > LOCK_STALE_MS; } catch { return false; }
+  }
   try { process.kill(pid, 0); return false; } catch (err) { return err.code === 'ESRCH'; }
 }
 
-/** True when the lock is ours; false when we gave up and proceed without it. */
+/** Serialize stale recovery separately and recheck after taking ownership.
+ * The recovery guard is never reaped automatically: recovery of a recovery
+ * process that crashed requires all writers to stop before manual cleanup.
+ * @param {string} lockPath
+ */
+function recoverStaleLock(lockPath) {
+  const guard = lockPath + '.recovery';
+  let fd;
+  try { fd = openSync(guard, 'wx', 0o600); }
+  catch (err) { if (err.code === 'EEXIST') return false; throw err; }
+  try {
+    writeSync(fd, JSON.stringify({ pid: process.pid, at: Date.now() }));
+    if (!lockIsStale(lockPath)) return false;
+    try { unlinkSync(lockPath); } catch (err) { if (err.code !== 'ENOENT') throw err; }
+    return true;
+  } finally {
+    closeSync(fd);
+    unlinkSync(guard);
+  }
+}
+
+/** Acquire exclusively or fail without running the writer. */
 async function acquireConfigLock(lockPath) {
   const waitMs = lockWaitMs();
   const deadline = Date.now() + waitMs;
@@ -239,17 +260,13 @@ async function acquireConfigLock(lockPath) {
       return true;
     } catch (err) {
       if (err.code !== 'EEXIST') {
-        console.error(`[RelayCrew] Cannot create ${lockPath} (${err.code || err.message}); writing the config without it`);
-        return false;
+        throw err;
       }
     }
-    if (lockIsStale(lockPath)) {
-      await unlink(lockPath).catch(() => {});
-      continue;
-    }
+    if (lockIsStale(lockPath) && recoverStaleLock(lockPath)) continue;
     if (Date.now() >= deadline) {
-      console.error(`[RelayCrew] ${lockPath} is still held by another process after ${waitMs}ms; writing the config without it`);
-      return false;
+      const error = Object.assign(new Error('Config is busy; retry after the current writer finishes.'), { code: 'CONFIG_LOCK_BUSY' });
+      throw error;
     }
     await new Promise(resolve => setTimeout(resolve, LOCK_POLL_MS));
   }
@@ -288,7 +305,19 @@ export async function saveConfig(config) {
   ensureAccountIds(config.accounts);
   // The proxy apiKey and every account's tokens live here: see writeJsonAtomic
   // for why this is not a plain writeFile.
-  await withConfigLock(path, () => writeJsonAtomic(path, config));
+  await withConfigLock(path, async () => {
+    let disk;
+    try { disk = JSON.parse(await readFile(path, 'utf8')); }
+    catch (err) { if (/** @type {{code?:string}} */ (err).code !== 'ENOENT') throw err; }
+    // Team policy belongs to read-modify-write operations. A stale whole-config
+    // snapshot (settings/TUI) must not restore a revoked credential or grant.
+    let snapshot = config;
+    if (disk?.proxy?.teamMode === true) {
+      snapshot = { ...config, proxy: { ...config.proxy } };
+      for (const field of ['teamMode', 'apiKey', 'clientKeys', 'trustLoopback']) snapshot.proxy[field] = disk.proxy[field];
+    }
+    await writeJsonAtomic(path, snapshot);
+  });
 }
 
 /**

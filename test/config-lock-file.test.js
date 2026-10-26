@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, writeFile, utimes } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -11,8 +11,8 @@ import { join } from 'node:path';
 // rotated refresh token — which costs a re-login. Writers therefore hold an
 // advisory lock file, `<config>.lock`, across the read-modify-write. These pin
 // the protocol other clients interoperate with: exclusive create, a JSON body
-// of {pid, at}, staleness by age or dead pid, a bounded wait, and that the lock
-// is advisory — a writer that cannot get it still writes.
+// of {pid, at}, staleness by dead pid or malformed age, a bounded wait, and
+// fail-closed writes when another live holder owns the lock.
 
 // `lockWaitMs` is the wait budget for the run, when a test's assertions depend
 // on it: a test that must observe a release before the budget runs out gets a
@@ -73,15 +73,15 @@ test('two concurrent atomicConfigUpdate calls both land', async () => {
   });
 });
 
-test('a lock older than 10 s is broken even though its pid is alive', async () => {
-  await withConfigDir(async ({ dir, cfg, path, lockPath }) => {
-    await writeFile(lockPath, JSON.stringify({ pid: process.pid, at: Date.now() - 60_000 }));
-    const { warnings, restore } = captureBypassWarnings();
-    try { await cfg.saveConfig({ fresh: true }); } finally { restore(); }
-    assert.deepEqual(warnings, [], 'a stale lock is broken, not waited out and bypassed');
-    assert.deepEqual(await readJson(path), { fresh: true });
-    assert.deepEqual(await readdir(dir), ['relaycrew.json'], 'the stale lock is gone');
-  });
+test('an old timestamp never steals a live holder lock', async () => {
+  await withConfigDir(async ({ cfg, path, lockPath }) => {
+    const before = await readFile(path, 'utf8');
+    const body = { pid: process.pid, at: Date.now() - 60_000 };
+    await writeFile(lockPath, JSON.stringify(body));
+    await assert.rejects(cfg.saveConfig({ fresh: true }), { code: 'CONFIG_LOCK_BUSY' });
+    assert.equal(await readFile(path, 'utf8'), before);
+    assert.deepEqual(await readJson(lockPath), body);
+  }, { lockWaitMs: 50 });
 });
 
 test('a fresh lock whose pid is dead is broken', async () => {
@@ -152,26 +152,29 @@ test('the lock is released after a success and after a throwing mutator', async 
   });
 });
 
-test('a lock that stays held past the wait budget is bypassed with one warning, and left in place', async () => {
-  // A short budget: what is asserted is that the writer waited at least that
-  // long and then gave up with one warning. How much later it actually ran is
-  // the scheduler's, not the code's, so no upper bound.
+test('a lock held past the wait budget refuses writes and leaves the holder intact', async () => {
   await withConfigDir(async ({ cfg, path, lockPath }) => {
-    // Fresh, and the pid is alive (ours): nothing lets a writer break it.
+    const before = await readFile(path, 'utf8');
     const body = { pid: process.pid, at: Date.now() };
     await writeFile(lockPath, JSON.stringify(body));
-    const { warnings, restore } = captureBypassWarnings();
-    try {
-      const started = Date.now();
-      await cfg.saveConfig({ fresh: true });
-      const waited = Date.now() - started;
-      assert.ok(waited >= 200, `gave up no sooner than the budget (waited ${waited}ms)`);
-    } finally {
-      restore();
-    }
-    assert.deepEqual(await readJson(path), { fresh: true }, 'the write still landed');
-    assert.equal(warnings.length, 1, warnings.join('\n'));
-    assert.match(warnings[0], /relaycrew\.json\.lock is still held by another process after 200ms/);
-    assert.deepEqual(await readJson(lockPath), body, 'the other holder\'s lock was not touched');
+    const started = Date.now();
+    await assert.rejects(cfg.saveConfig({ fresh: true }), { code: 'CONFIG_LOCK_BUSY' });
+    assert.ok(Date.now() - started >= 200);
+    assert.equal(await readFile(path, 'utf8'), before);
+    assert.deepEqual(await readJson(lockPath), body);
   }, { lockWaitMs: 200 });
+});
+
+
+test('malformed lock metadata recovers only after the file is old', async () => {
+  await withConfigDir(async ({ cfg, path, lockPath }) => {
+    await writeFile(lockPath, JSON.stringify({ at: 'invalid', pid: null }));
+    const before = await readFile(path, 'utf8');
+    await assert.rejects(cfg.saveConfig({ fresh: true }), { code: 'CONFIG_LOCK_BUSY' });
+    assert.equal(await readFile(path, 'utf8'), before);
+    const old = new Date(Date.now() - 60000);
+    await utimes(lockPath, old, old);
+    await cfg.saveConfig({ fresh: true });
+    assert.deepEqual(await readJson(path), { fresh: true });
+  }, { lockWaitMs: 50 });
 });
