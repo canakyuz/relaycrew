@@ -30,6 +30,7 @@ import { codexSpentWindows, isAccountWideCodexWindow } from './codex-quota.js';
 import { atomicConfigUpdate } from './config.js';
 import { ConfigOpError, setThreshold, thresholdRatio } from './config-ops.js';
 import { envVar, legacyControlUrl } from './brand.js';
+import { authenticateTeam, validateTeamConfig, teamAccessFor, teamExclusions, teamError, teamInferencePath } from './team-access.js';
 /** @typedef {import('./types.js').CodedError} CodedError */
 
 
@@ -325,7 +326,7 @@ export function isForwardedRequest(headers) {
  *     working with it; documented as required behind a reverse proxy.
  */
 export function loopbackExempt(headers, remoteAddress, proxyConfig) {
-  if (proxyConfig?.trustLoopback === false) return false;
+  if (proxyConfig?.teamMode === true || proxyConfig?.trustLoopback === false) return false;
   if (!isLoopbackAddr(remoteAddress)) return false;
   return !isForwardedRequest(headers);
 }
@@ -397,7 +398,9 @@ function usableClientKeys(clientKeys) {
   return clientKeys.filter(e => typeof e?.name === 'string' && e.name.trim() && e.key);
 }
 
+/** @param {Record<string, any>|undefined} proxyConfig @param {unknown} presented @returns {{ok: boolean, client: string|null, identity?: import('./team-access.js').TeamIdentity|null}} */
 export function resolveClientAuth(proxyConfig, presented) {
+  if (proxyConfig?.teamMode === true) return authenticateTeam(proxyConfig, presented);
   const shared = proxyConfig?.apiKey;
   const clientKeys = Array.isArray(proxyConfig?.clientKeys) ? usableClientKeys(proxyConfig.clientKeys) : [];
   if (!shared && clientKeys.length === 0) return { ok: true, client: null };
@@ -451,6 +454,7 @@ export function callerView(client) {
  *   key-less caller naming the very address it listens on (#423).
  */
 export function createProxyServer(accountManager, config, hooks = {}, sx = null, clientUsage = null, dimensionUsage = null, { bindHost = null } = {}) {
+  validateTeamConfig(config.proxy);
   const boundHost = () => bindHost || config.proxy?.host;
   const upstream = config.upstream || 'https://api.anthropic.com';
   const holdMs = (config.holdSeconds || 0) * 1000;
@@ -518,6 +522,18 @@ export function createProxyServer(accountManager, config, hooks = {}, sx = null,
       // a valid client key is attributed like any other; loopback without one
       // passed only via the exemption and stays unattributed.
       req.tcClient = auth.ok ? auth.client : null;
+      req.tcTeamIdentity = auth.identity ?? null;
+      if (config.proxy?.teamMode === true && req.tcTeamIdentity?.kind === 'member') {
+        if (req.method === 'GET' && req.url === '/teamclaude/me') {
+          res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+          res.end(JSON.stringify(teamAccessFor(config).status(req.tcTeamIdentity, clientUsage)));
+          return;
+        }
+        if (!teamInferencePath(req.method, req.url)) {
+          teamError(res, 403, 'Members may access inference endpoints and /teamclaude/me only');
+          return;
+        }
+      }
 
       // Control-plane mutations are refused when the request was issued by a web
       // page. The gate above exempts loopback from the API key, so without this
@@ -1056,6 +1072,11 @@ export function createProxyServer(accountManager, config, hooks = {}, sx = null,
         socket.destroy();
         return;
       }
+      if (config.proxy?.teamMode === true && auth.identity?.kind === 'member') {
+        const status = providerForPath(req.url) !== DEFAULT_PROVIDER ? '501 Not Implemented' : '403 Forbidden';
+        socket.end(`HTTP/1.1 ${status}\r\nConnection: close\r\n\r\n`);
+        return;
+      }
       // The identity the gate resolved rides along, as it does on the request
       // path (req.tcClient): a handshake authenticated with a client key is
       // attributed to that client, or it is a channel the operator cannot see
@@ -1468,14 +1489,15 @@ export function clientSessionId(headers) {
  * @param {ActivityHooks} [opts.hooks]
  * @param {Object|null} [opts.sx]
  * @param {number} [opts.holdMs]
- * @param {Object} [opts.config]  the live config object; read per request, never copied
+ * @param {Record<string, any>} [opts.config]  the live config object; read per request, never copied
  * @param {string|null} [opts.forcedPin]
  * @param {Object|null} [opts.egress]
  * @param {Object|null} [opts.clientUsage]
+ * @param {import('./team-access.js').TeamIdentity|null} [opts.forcedIdentity]
  * @param {string|null} [opts.forcedClient]
  * @param {Object|null} [opts.dimensionUsage]
  */
-export function createProxyRequestListener({ accountManager, upstream, logDir = null, hooks = {}, sx = null, holdMs = 0, config = {}, forcedPin = null, egress = null, clientUsage = null, forcedClient = null, dimensionUsage = null }) {
+export function createProxyRequestListener({ accountManager, upstream, logDir = null, hooks = {}, sx = null, holdMs = 0, config = {}, forcedPin = null, egress = null, clientUsage = null, forcedClient = null, forcedIdentity = null, dimensionUsage = null }) {
   let counter = 0;
   return async (req, res) => {
     // The activity entry this request opened, while it is still open. Every
@@ -1484,13 +1506,21 @@ export function createProxyRequestListener({ accountManager, upstream, logDir = 
     // outer catch tells an entry it still has to account for from one that is
     // already closed.
     let openEntry = null;
+    const identity = forcedIdentity ?? req.tcTeamIdentity ?? null;
+    const access = config.proxy?.teamMode === true ? teamAccessFor(config).enter(identity, res) : null;
+    if (config.proxy?.teamMode === true && !access) return;
+    const sessionFor = (/** @type {import('node:http').IncomingHttpHeaders} */ headers) => access ? access.session(clientSessionId(headers)) : clientSessionId(headers);
     try {
+      if (identity?.kind === 'member' && !teamInferencePath(req.method, req.url)) {
+        teamError(res, 403, 'Members may access inference endpoints only');
+        return;
+      }
       // Refused before any path-prefix classification below, so each of those
       // sees the path upstream will see (see hasDotSegment). Logged like the
       // unknown-pin 404: an operator should see a client probing the boundary.
       if (hasDotSegment(req.url)) {
         const reqId = ++counter;
-        const sessionId = req.headers['x-claude-code-session-id'] || null;
+        const sessionId = sessionFor(req.headers);
         hooks.onRequestEnd?.(reqId, { method: req.method, path: safeLine(req.url), account: '(refused: dot-segment in path)', status: 400, model: null, sessionId, pinned: false });
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ type: 'error', error: { type: 'invalid_request_error', message: 'Request path must not contain dot-segments' } }));
@@ -1518,10 +1548,10 @@ export function createProxyRequestListener({ accountManager, upstream, logDir = 
       // rather than per-account: it is a property of the connection, and this is
       // the one path every request takes, MITM included.
       if (egress?.enabled()) {
-        const state = await egress.waitUntilPinned({ isAborted: () => clientGone(res) });
+        const state = await egress.waitUntilPinned({ isAborted: () => access?.signal.aborted || clientGone(res) });
         if (clientGone(res)) return;
         if (!state.ok) {
-          recordEarlyOutcome(accountManager, { sessionId: clientSessionId(req.headers) }, req.url, false);
+          recordEarlyOutcome(accountManager, { sessionId: sessionFor(req.headers) }, req.url, false);
           res.writeHead(503, { 'Content-Type': 'application/json', 'retry-after': '30' });
           res.end(JSON.stringify({
             type: 'error',
@@ -1566,7 +1596,7 @@ export function createProxyRequestListener({ accountManager, upstream, logDir = 
           // value on the path that can carry raw control bytes.
           const shown = safeLine(token ?? raw);
           const reqId = ++counter;
-          const sessionId = clientSessionId(req.headers);
+          const sessionId = sessionFor(req.headers);
           if (!hideActivity) hooks.onRequestEnd?.(reqId, { method: req.method, path: req.url, account: `(unknown pin: "${shown}")`, status: 404, model: null, sessionId, pinned: false });
           res.writeHead(404, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ type: 'error', error: { type: 'not_found_error', message: `Unknown account pin "${shown}"` } }));
@@ -1605,6 +1635,10 @@ export function createProxyRequestListener({ accountManager, upstream, logDir = 
       // either pool, and goes to that host as sent (#492). Before the identity
       // plane below, which is Anthropic's.
       const passthrough = clientPassthroughOrigin({ authority: requestAuthority(req), url: req.url, config, accounts: /** @type {any} */ (accountManager).accounts });
+      if (passthrough && identity?.kind === 'member') {
+        teamError(res, 403, 'Member requests must use a pooled inference endpoint');
+        return;
+      }
       if (passthrough) { await relayStream(req, res, passthrough, sx, shouldStripOverageHeaders(config)); return; }
 
       const classifiedPath = classificationPath(req.url);
@@ -1620,7 +1654,7 @@ export function createProxyRequestListener({ accountManager, upstream, logDir = 
         pinnedIndex = resolveAccountPin(accountManager, forcedPin);
         if (pinnedIndex == null) {
           const reqId = ++counter;
-          const sessionId = clientSessionId(req.headers);
+          const sessionId = sessionFor(req.headers);
           if (!hideActivity) hooks.onRequestEnd?.(reqId, { method: req.method, path: req.url, account: `(unknown pin: "${safeLine(forcedPin)}")`, status: 404, model: null, sessionId, pinned: false });
           res.writeHead(404, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ type: 'error', error: { type: 'not_found_error', message: `Unknown account pin "${forcedPin}" (from TC_ACCT)` } }));
@@ -1636,7 +1670,7 @@ export function createProxyRequestListener({ accountManager, upstream, logDir = 
       // account that has since gone answers the same honest 404 rather than
       // quietly routing the session somewhere the operator did not choose.
       if (pinnedIndex == null) {
-        const sessionId = clientSessionId(req.headers);
+        const sessionId = sessionFor(req.headers);
         const sessionPin = /** @type {any} */ (accountManager).sessionPins?.get(sessionId) ?? null;
         if (sessionPin != null) {
           pinnedIndex = resolveAccountPin(accountManager, sessionPin);
@@ -1651,11 +1685,12 @@ export function createProxyRequestListener({ accountManager, upstream, logDir = 
         }
       }
 
+      const pinnedAccountId = pinnedIndex == null ? null : accountManager.accounts[pinnedIndex]?.id;
       const reqId = ++counter;
       // Claude Code tags each session's requests with this header (present on
       // /v1/messages and count_tokens). Read from headers up front so it drives
       // session-aware routing (issue #109) and colors the TUI activity stream.
-      const sessionId = clientSessionId(req.headers);
+      const sessionId = sessionFor(req.headers);
       if (!hideActivity) {
         // Marked open BEFORE the hook runs. The shipped TUI hook registers its
         // row and then renders, and the render can rethrow, so a hook that
@@ -1766,7 +1801,7 @@ export function createProxyRequestListener({ accountManager, upstream, logDir = 
       // stripOverage and synthesizeQuota are sampled once here, at dispatch:
       // retries and holds of this request keep them, and a reload applies to
       // subsequent requests.
-      const ctx = { account: null, status: null, tried: new Set(), reauthed: new Set(), model, advisorModel, streamRequested: parseRequestStream(body), fleetMessageThreads: config?.messageThreads === true, pinnedIndex, provider, holdBudgetMs: holdMs, pinKey, onMessage, client, delivered: false, abandoned: false, onUsage: usageRecorder.onUsage, stripHeaders, stripOverage: shouldStripOverageHeaders(config), synthesizeQuota: shouldSynthesizeQuotaHeaders(config), logLevel: resolveLogLevel(config), logMaxBodyBytes: resolveLogMaxBodyBytes(config) };
+      const ctx = { access, teamPinnedId: pinnedAccountId, account: null, status: null, tried: new Set(), reauthed: new Set(), model, advisorModel, streamRequested: parseRequestStream(body), fleetMessageThreads: config?.messageThreads === true, pinnedIndex, provider, holdBudgetMs: holdMs, pinKey, onMessage, client, delivered: false, abandoned: false, onUsage: usageRecorder.onUsage, stripHeaders, stripOverage: shouldStripOverageHeaders(config), synthesizeQuota: shouldSynthesizeQuotaHeaders(config), logLevel: resolveLogLevel(config), logMaxBodyBytes: resolveLogMaxBodyBytes(config) };
       // Hold the session "in flight" across the WHOLE request (incl. retries and
       // a multi-minute streaming completion) so it stays counted as active and
       // never expires mid-request.
@@ -1789,7 +1824,7 @@ export function createProxyRequestListener({ accountManager, upstream, logDir = 
       // worst failure, not "the user left".
       const requestAbort = new AbortController();
       const onRequestClose = () => { if (!res.writableEnded && !ctx.proxyClosed) requestAbort.abort(clientGoneError()); };
-      ctx.signal = requestAbort.signal;
+      ctx.signal = access ? AbortSignal.any([requestAbort.signal, access.signal]) : requestAbort.signal;
       res.once('close', onRequestClose);
       if (clientGone(res)) onRequestClose();
       try {
@@ -3057,6 +3092,31 @@ function respondUnrenewed(res, ctx, accountManager) {
 }
 
 export async function forwardRequest(req, res, body, accountManager, upstream, retryCount, hooks, reqId, ctx, logDir, sx, useSx) {
+  if (ctx.access && !ctx.access.valid()) {
+    ctx.status = 401;
+    teamError(res, 401, 'Team credential has been revoked or rotated');
+    return;
+  }
+  if (ctx.access && ctx.pinnedIndex != null) {
+    ctx.teamPinnedId ??= accountManager.accounts[ctx.pinnedIndex]?.id;
+    const index = accountManager.accounts.findIndex(a => a.id === ctx.teamPinnedId);
+    if (index < 0) {
+      ctx.status = 403;
+      teamError(res, 403, 'Pinned account is no longer available');
+      return;
+    }
+    ctx.pinnedIndex = index;
+  }
+  if (ctx.access && ctx.teamHopId) {
+    ctx.hopTo = accountManager.accounts.findIndex(a => a.id === ctx.teamHopId);
+    ctx.teamHopId = null;
+    if (ctx.hopTo < 0) {
+      ctx.status = 403;
+      teamError(res, 403, 'Selected account is no longer available');
+      return;
+    }
+  }
+  const selectionExclusions = () => teamExclusions(ctx.access, accountManager.accounts, ctx.tried);
   const maxRetries = accountManager.accounts.length;
   // This function is exported, so a caller may hand us a ctx built elsewhere.
   // The 401 path reads ctx.reauthed on every response; default it here rather
@@ -3115,8 +3175,14 @@ export async function forwardRequest(req, res, body, accountManager, upstream, r
     : ctx.pinnedIndex != null
       ? (pinned && !pinnedWrongProvider && !accountManager.capBars(pinned, ctx.model, ctx.advisorModel) ? pinned : null)
       : accountManager.getActiveAccount(
-        ctx.tried, ctx.model, ctx.advisorModel, ctx.pinKey, ctx.provider, selection,
+        selectionExclusions(), ctx.model, ctx.advisorModel, ctx.pinKey, ctx.provider, selection,
       );
+  if (account && ctx.access && !ctx.access.allows(account)) {
+    ctx.status = 403;
+    teamError(res, 403, 'Account is outside your team grant');
+    return;
+  }
+  if (account && ctx.access) ctx.access.account = account;
   // Accounts a rollover deliberately routed this request away from. Request-
   // scoped: the decision belongs to the request, not to one attempt of it.
   if (selection.rolledOff) {
@@ -3136,6 +3202,11 @@ export async function forwardRequest(req, res, body, accountManager, upstream, r
         message: `Pinned account "${pinned.name}" is a ${providerOf(pinned)} subscription and cannot serve a ${ctx.provider} request.`,
       },
     }));
+    return;
+  }
+  if (!account && ctx.access?.identity.kind === 'member') {
+    ctx.status = 429;
+    teamError(res, 429, 'No permitted account is available; retry shortly');
     return;
   }
   if (!account) {
@@ -3437,7 +3508,13 @@ export async function forwardRequest(req, res, body, accountManager, upstream, r
     // clientGone — so this is a pure abandonment exit. It fires while an account
     // is paused or ramping, which is exactly when clients give up, so leaving it
     // unmarked clustered false positives where the signal is read hardest.
-    if (!await accountManager.admit(account.index, () => clientGone(res))) { ctx.abandoned = true; return; }
+    if (!await accountManager.admit(account.index, () => ctx.signal?.aborted || clientGone(res))) { ctx.abandoned = true; return; }
+    if (ctx.access && (!ctx.access.valid() || !ctx.access.allows(account) || !accountManager.accounts.includes(account))) {
+      accountManager.release(account.index, { successful: false });
+      ctx.status = 403;
+      teamError(res, 403, 'Team access changed while waiting');
+      return;
+    }
     accountManager.beginActivity(account.index);
     activityOpened = true;
     // This request may have selected the account before another in-flight request
@@ -3465,6 +3542,7 @@ export async function forwardRequest(req, res, body, accountManager, upstream, r
       upstreamRes = await upstreamFetch(upstreamUrl, {
         method,
         headers,
+        authorize: ctx.access ? () => ctx.access.valid() && ctx.access.allows(account) && accountManager.accounts.includes(account) : undefined,
         // Cancels the admission wait and the request itself when the client
         // goes away (see the listener's AbortController).
         signal: ctx.signal,
@@ -3678,7 +3756,7 @@ export async function forwardRequest(req, res, body, accountManager, upstream, r
         // pickAlternate, not getActiveAccount: the hop detours THIS request and
         // must leave the fleet cursor where it is (#286).
         const alt = accountManager.pickAlternate(
-          new Set([...ctx.tried, ...(ctx.rolledOff || []), account.index]),
+          new Set([...selectionExclusions(), ...(ctx.rolledOff || []), account.index]),
           ctx.model, ctx.advisorModel, ctx.provider,
         );
         if (alt && !accountManager.isPaused(alt.index)) {
@@ -3687,6 +3765,7 @@ export async function forwardRequest(req, res, body, accountManager, upstream, r
           // "IP-scoped" reading of a second 429 below rests on.
           ctx.rateLimitHopSharedExit = !routed && !alt.routing;
           ctx.hopTo = alt.index;
+          if (ctx.access) ctx.teamHopId = alt.id;
           ctx.tried.add(account.index);
           console.log(`[TeamClaude] Rate-limit 429 on "${account.name}" — failing over once to idle account "${alt.name}"`);
           if (clientGone(res)) { ctx.abandoned = true; return; }
@@ -3835,13 +3914,14 @@ export async function forwardRequest(req, res, body, accountManager, upstream, r
     if (upstreamRes.status >= 500 && !res.headersSent && !ctx.serverErrorHopped && retryCount < maxRetries) {
       // Same exclusion as the 429 hop, and the same cursor-preserving pick.
       const alt = accountManager.pickAlternate(
-        new Set([...ctx.tried, ...(ctx.rolledOff || []), account.index]),
+        new Set([...selectionExclusions(), ...(ctx.rolledOff || []), account.index]),
         ctx.model, ctx.advisorModel, ctx.provider,
       );
       if (alt && !accountManager.isPaused(alt.index)) {
         await upstreamRes.body?.cancel();
         ctx.serverErrorHopped = true;
         ctx.hopTo = alt.index;
+        if (ctx.access) ctx.teamHopId = alt.id;
         ctx.tried.add(account.index);
         console.log(`[TeamClaude] Upstream ${upstreamRes.status} on "${account.name}" — failing over once to "${alt.name}"`);
         if (clientGone(res)) { ctx.abandoned = true; return; }
@@ -3947,7 +4027,7 @@ export async function forwardRequest(req, res, body, accountManager, upstream, r
     if (isStreaming && upstreamRes.status < 400 && upstreamBody && !res.headersSent
         && !ctx.streamFailureHopped && retryCount < maxRetries) {
       const alt = accountManager.pickAlternate(
-        new Set([...ctx.tried, ...(ctx.rolledOff || []), account.index]),
+        new Set([...selectionExclusions(), ...(ctx.rolledOff || []), account.index]),
         ctx.model, ctx.advisorModel, ctx.provider,
       );
       if (alt && !accountManager.isPaused(alt.index)) {
@@ -3957,6 +4037,7 @@ export async function forwardRequest(req, res, body, accountManager, upstream, r
           await peeked.cancel();
           ctx.streamFailureHopped = true;
           ctx.hopTo = alt.index;
+          if (ctx.access) ctx.teamHopId = alt.id;
           ctx.tried.add(account.index);
           console.log(`[TeamClaude] Stream failed inside a ${upstreamRes.status} on "${account.name}" (${peeked.failureCode}) — failing over once to "${alt.name}"`);
           if (clientGone(res)) { ctx.abandoned = true; return; }

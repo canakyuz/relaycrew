@@ -6,6 +6,7 @@ import { randomBytes } from 'node:crypto';
 import { resolveUpstreamProxy, setUpstreamProxy } from './upstream-proxy.js';
 import { ensureAccountIds, accountIdsComplete } from './account-id.js';
 import { envVar, NAME, LEGACY_NAME } from './brand.js';
+import { validateTeamConfig } from './team-access.js';
 
 export function getConfigPath() {
   const fromEnv = envVar('CONFIG');
@@ -125,6 +126,7 @@ export async function loadConfig() {
   const path = getConfigPath();
   try {
     const config = JSON.parse(await readFile(path, 'utf-8'));
+    validateTeamConfig(config.proxy);
     // A file with no `accounts` key is what an empty or hand-trimmed config
     // looks like. Every reader treats the list as always present, and the first
     // one to trip was the save path — so the failure arrived while writing,

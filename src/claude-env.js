@@ -167,9 +167,10 @@ export function clearSelfProxyEnvLines(port, env = process.env) {
  * @param {number} [opts.holdSeconds]
  * @param {string|null} [opts.account]
  * @param {string} [opts.proxyApiKey]
+ * @param {boolean} [opts.requireProxyAuth]
  * @param {string|null} [opts.inheritedNoProxy]
  */
-export function buildClaudeEnvLines({ port, useMitm = true, caPath = null, holdSeconds = 0, account = null, proxyApiKey = '', inheritedNoProxy = null }) {
+export function buildClaudeEnvLines({ port, useMitm = true, caPath = null, holdSeconds = 0, account = null, proxyApiKey = '', requireProxyAuth = false, inheritedNoProxy = null }) {
   const lines = [];
   const pin = (account || '').trim();
   // The port is interpolated unquoted into URLs the shell evals, so it has to
@@ -177,7 +178,7 @@ export function buildClaudeEnvLines({ port, useMitm = true, caPath = null, holdS
   port = validPort(port);
 
   if (useMitm) {
-    const userinfo = pin ? `${encodePinComponent(pin)}:${encodePinComponent(proxyApiKey || '')}@` : '';
+    const userinfo = pin ? `${encodePinComponent(pin)}:${encodePinComponent(proxyApiKey || '')}@` : requireProxyAuth ? `:${encodePinComponent(proxyApiKey)}@` : '';
     const proxyUrl = `http://${userinfo}127.0.0.1:${port}`;
     const noProxy = mergeNoProxy(inheritedNoProxy);
     lines.push(
@@ -196,6 +197,7 @@ export function buildClaudeEnvLines({ port, useMitm = true, caPath = null, holdS
     // Clear any stale base-URL so the two modes don't stack in one shell.
     lines.push('unset ANTHROPIC_BASE_URL');
   } else {
+    if (requireProxyAuth) lines.push(`export ANTHROPIC_API_KEY=${shellQuote(proxyApiKey)}`);
     const prefix = pin ? `/tc-acct/${encodePinComponent(pin)}` : '';
     lines.push(`export ANTHROPIC_BASE_URL=http://localhost:${port}${prefix}`);
   }

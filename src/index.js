@@ -10,6 +10,8 @@ import { installCrashHandlers } from './crash-log.js';
 import { AccountManager, distributionMode, accountRouting } from './account-manager.js';
 import { validateAdaptiveConfig } from './adaptive-distribution.js';
 import { createProxyServer, reloadedHeaderFlags } from './server.js';
+import { teamAccessFor } from './team-access.js';
+import { teamCommand } from './team-command.js';
 import { importCredentials, loginOAuth, loginOAuthWithPastedCode, startOAuthLogin, fetchProfile, profileForCredentials, refreshAccessToken, isTokenExpired, isTokenExpiringSoon } from './oauth.js';
 import {
   sameIdentity,
@@ -176,6 +178,10 @@ const args = process.argv.slice(2);
 const command = args[0];
 
 switch (command) {
+  case 'team':
+    await teamCommand(args.slice(1));
+    process.exit(process.exitCode || 0);
+    break;
   case 'server':
     await serverCommand();
     break;
@@ -567,6 +573,8 @@ async function serverCommand() {
     // key add/rotate/revoke needs — no restart).
     if (config.proxy && diskConfig.proxy) {
       config.proxy.clientKeys = diskConfig.proxy.clientKeys;
+      config.proxy.teamMode = diskConfig.proxy.teamMode;
+      config.proxy.trustLoopback = diskConfig.proxy.trustLoopback;
       // Dimensions are resolved per request from this same object, so a
       // reload adds or drops one without a restart.
       config.proxy.usageDimensions = diskConfig.proxy.usageDimensions;
@@ -574,6 +582,7 @@ async function serverCommand() {
       // The shared key is read per request too, so a rotated key on disk
       // takes effect on reload the same way.
       config.proxy.apiKey = diskConfig.proxy.apiKey;
+      teamAccessFor(config).refresh();
     }
     // The MCP endpoint's mode: read per request, so this is what opens,
     // narrows or closes it without a restart. Outside the guard above on
@@ -1489,7 +1498,7 @@ async function envCommand() {
   try {
     lines = buildClaudeEnvLines({
       port, useMitm, caPath, holdSeconds: config.holdSeconds,
-      account, proxyApiKey: config.proxy?.apiKey || '',
+      account, proxyApiKey: config.proxy?.apiKey || '', requireProxyAuth: config.proxy?.teamMode === true,
       // The shell doing the eval keeps its own NO_PROXY entries; re-running is
       // idempotent, since the merged value is what it will have next time.
       inheritedNoProxy: [process.env.NO_PROXY, process.env.no_proxy].filter(Boolean).join(','),
@@ -1585,7 +1594,7 @@ async function runCommand() {
       // form, so auth and pinning coexist in one URL.
       const userinfo = tcAcct
         ? `${encodePinComponent(tcAcct)}:${encodePinComponent(config.proxy?.apiKey || '')}@`
-        : '';
+        : config.proxy?.teamMode === true ? `:${encodePinComponent(config.proxy.apiKey)}@` : '';
       const proxyUrl = `http://${userinfo}127.0.0.1:${port}`;
       env.HTTPS_PROXY = env.HTTP_PROXY = env.https_proxy = env.http_proxy = proxyUrl;
       // Keep the operator's own NO_PROXY and add ours — see mergeNoProxy. Both
@@ -1603,6 +1612,7 @@ async function runCommand() {
       }
       delete env.ANTHROPIC_BASE_URL;
     } else {
+      if (config.proxy?.teamMode === true) env.ANTHROPIC_API_KEY = config.proxy.apiKey;
       // Only set ANTHROPIC_BASE_URL — Claude Code keeps its own OAuth token
       // which the proxy accepts from localhost. Not setting ANTHROPIC_API_KEY
       // lets Claude Code stay in subscription mode (full model access).
@@ -2832,6 +2842,7 @@ async function routingCommand() {
 // ── help ────────────────────────────────────────────────────
 
 function showHelp() {
+  console.log('Team administration: teamclaude team --help\n');
   console.log(`TeamClaude - Multi-account Claude proxy
 
 Usage: teamclaude [command] [options]

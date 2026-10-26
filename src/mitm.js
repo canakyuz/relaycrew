@@ -20,6 +20,7 @@ import tls from 'node:tls';
 import http2 from 'node:http2';
 import { getConfigPath } from './config.js';
 import { generateCertChain } from './x509.js';
+import { teamIdentityValid } from './team-access.js';
 import { createProxyRequestListener, resolveClientAuth, loopbackExempt, relayUpgrade, resolveAccountPin, describeConnectError, KEEP_ALIVE_TIMEOUT_MS, shouldStripOverageHeaders } from './server.js';
 import { interceptHostsFor, isNeverIntercepted, providerForPath, DEFAULT_PROVIDER } from './provider.js';
 import { forwardRefusal, guardedLookup, FORBIDDEN_FORWARD } from './forward-target.js';
@@ -235,7 +236,7 @@ export function upgradeUpstreamFor(hostHeader, config, upstream) {
  * Build a `connect` event handler implementing the terminating MITM described at
  * the top of this file.
  * @param {Object} opts
- * @param {Object} opts.config
+ * @param {Record<string, any>} opts.config
  * @param {Object} opts.accountManager
  * @param {() => Promise<{ key: string, cert: string }>} opts.ensureLeaf  current leaf PEMs
  * @param {string|null} [opts.logDir]
@@ -264,11 +265,12 @@ export function createConnectHandler({ config, accountManager, ensureLeaf, logDi
   // Proxy over the session socket. A listener bound to the account is the same
   // information with none of that. The client identity from the CONNECT's
   // Proxy-Authorization rides the same mechanism (a listener bound to the
-  // client), for the same reason. The map is bounded by accounts × client keys,
-  // both operator-controlled.
+  // client), for the same reason. Credential fingerprints keep rotated keys
+  // bound to their original identity; historical entries remain until restart.
   const serverPromises = new Map();
-  const getServer = (pin = '', client = null) => {
-    const mapKey = `${pin}\u0000${client || ''}`;
+  /** @param {string} [pin] @param {string|null} [client] @param {import('./team-access.js').TeamIdentity|null} [identity] */
+  const getServer = (pin = '', client = null, identity = null) => {
+    const mapKey = `${pin}\u0000${client || ''}\u0000${identity?.fingerprint || ''}`;
     let p = serverPromises.get(mapKey);
     if (p) return p;
     p = (async () => {
@@ -304,7 +306,7 @@ export function createConnectHandler({ config, accountManager, ensureLeaf, logDi
     // Node 24.6 adds this buffer when an HTTP/1 response finishes, but its
     // HTTP/2 server leaves it undefined; timeout + undefined would be NaN.
     /** @type {any} */ (srv).keepAliveTimeoutBuffer ??= 1_000;
-    srv.on('request', createProxyRequestListener({ accountManager, upstream, logDir, hooks, sx, holdMs, config, forcedPin: pin || null, egress, clientUsage, forcedClient: client, dimensionUsage }));
+    srv.on('request', createProxyRequestListener({ accountManager, upstream, logDir, hooks, sx, holdMs, config, forcedPin: pin || null, egress, clientUsage, forcedClient: client, forcedIdentity: identity, dimensionUsage }));
     // Remote Control's real-time channel is a WebSocket (Upgrade handshake),
     // which never fires 'request' — only 'upgrade', with a raw socket instead
     // of a response object (h1-only; falls back to blind h2 passthrough is not
@@ -313,6 +315,12 @@ export function createConnectHandler({ config, accountManager, ensureLeaf, logDi
     // throw here exits the process (#340).
     srv.on('upgrade', (req, socket, head) => {
       try {
+        if (config.proxy?.teamMode === true && (identity?.kind !== 'admin' || !teamIdentityValid(config.proxy, identity))) {
+          const status = !teamIdentityValid(config.proxy, identity) ? '401 Unauthorized'
+            : providerForPath(req.url) !== DEFAULT_PROVIDER ? '501 Not Implemented' : '403 Forbidden';
+          socket.end(`HTTP/1.1 ${status}\r\nConnection: close\r\n\r\n`);
+          return;
+        }
         const target = upgradeUpstreamFor(req.headers.host, config, upstream);
         if (!target) {
           log(`[TeamClaude] MITM: refusing a WebSocket Upgrade for host ${JSON.stringify(safeLine(req.headers.host, 64))}, which this proxy does not intercept`);
@@ -395,6 +403,11 @@ export function createConnectHandler({ config, accountManager, ensureLeaf, logDi
     }
     const { host, port } = authority;
     const mode = hostMode(host, config);
+
+    if (config.proxy?.teamMode === true && auth.identity?.kind === 'member' && mode !== 'rewrite') {
+      refuseRaw(clientSocket, '403 Forbidden');
+      return;
+    }
 
     if (mode === 'tunnel') {
       // Destination policy (see forward-target.js): a tunnel may not reach
@@ -492,7 +505,7 @@ export function createConnectHandler({ config, accountManager, ensureLeaf, logDi
       return;
     }
 
-    getServer(pin || '', auth.client).then((srv) => {
+    getServer(pin || '', auth.client, auth.identity ?? null).then((srv) => {
       reply200Raw(clientSocket);
       if (head && head.length) clientSocket.unshift(head);
       srv.emit('connection', clientSocket);
@@ -565,8 +578,9 @@ function redactToken(token) {
  */
 export function resolveConnectAuth(req, socket, proxyConfig) {
   const hasKeys = !!(proxyConfig?.apiKey || (Array.isArray(proxyConfig?.clientKeys) && proxyConfig.clientKeys.length));
-  if (!hasKeys) return { ok: true, client: null };
+  if (!hasKeys && proxyConfig?.teamMode !== true) return { ok: true, client: null };
   const m = /^\s*(basic|bearer)\s+(.+?)\s*$/i.exec(req?.headers?.['proxy-authorization'] || '');
+  /** @type {{ok: boolean, client: string|null, identity?: import('./team-access.js').TeamIdentity|null}} */
   let auth = { ok: false, client: null };
   if (m) {
     let presented = m[2];

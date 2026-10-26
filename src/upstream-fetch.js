@@ -152,6 +152,7 @@ export function upstreamFetch(url, opts = {}, sx = null, useProxy = false) {
   // is hand-rolled at all), so an upstream proxy overrides it rather than being
   // silently dropped — on a host that needs the proxy, ignoring it means every
   // request fails.
+  if (fetchOpts.authorize && !fetchOpts.authorize()) return Promise.reject(new Error('Team access changed before dispatch'));
   const useGlobal = USE_GLOBAL_FETCH && !proxyForHost(new URL(url).hostname);
   return useGlobal ? directFetch(url, fetchOpts, timeoutMs) : pooledFetch(url, nodeOpts, timeoutMs);
 }
@@ -281,6 +282,7 @@ async function nodeRequest(u, opts, timeoutMs, { transport, agent }) {
     forget();
   };
   try {
+    if (opts.authorize && !opts.authorize()) throw new Error('Team access changed before dispatch');
     return await sendNodeRequest(u, opts, timeoutMs, { transport, agent }, release);
   } catch (err) { release(); throw err; }
 }
