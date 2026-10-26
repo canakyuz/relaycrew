@@ -630,7 +630,7 @@ export function createProxyServer(accountManager, config, hooks = {}, sx = null,
         res.writeHead(200, { 'Content-Type': 'application/json' });
         // Counters only: how full the upstream admission gate is (see
         // upstream-fetch.js), never which origins or requests.
-        res.end(JSON.stringify({ ...extra, ...status, caller: callerView(req.tcClient), configuredUsageDimensions: (config.proxy?.usageDimensions ?? []).map((/** @type {{name: string}} */ dimension) => dimension.name), upstreamPool: upstreamPoolStatus() }, null, 2));
+        res.end(JSON.stringify({ ...extra, ...status, caller: callerView(req.tcClient), dashboardPreview: config.dashboardPreview === true, configuredUsageDimensions: (config.proxy?.usageDimensions ?? []).map((/** @type {{name: string}} */ dimension) => dimension.name), upstreamPool: upstreamPoolStatus() }, null, 2));
         return;
       }
 

@@ -17,7 +17,8 @@
     "test": "node --test --test-timeout=120000",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json",
-    "typecheck:strict": "node scripts/typecheck-strict.mjs"
+    "typecheck:strict": "node scripts/typecheck-strict.mjs",
+    "preview": "node scripts/preview-dashboard.mjs"
   },
   "keywords": [
     "claude",

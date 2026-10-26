@@ -1092,3 +1092,18 @@ test('a backend account card draws its probed windows, not "quota unknown" (#530
     { rows: [], text: 'Balance: $4.20' });
   assert.deepEqual(backendQuotaRows(null, now), { rows: [], text: null });
 });
+
+test('a stale status refusal cannot erase a replacement browser credential', async () => {
+  const page = bootPage({ storedKey: 'old-administrator' });
+  page.store.set('relaycrew-dashboard-key', 'new-administrator');
+  await page.answer(401);
+  assert.equal(page.store.get('relaycrew-dashboard-key'), 'new-administrator');
+  assert.notEqual(page.byId('keybox').style.display, 'block');
+});
+
+test('status from a previous browser credential is discarded before rendering', async () => {
+  const page = bootPage({ storedKey: 'old-administrator' });
+  page.store.set('relaycrew-dashboard-key', 'new-administrator');
+  await page.answer(200, { accounts: [{ name: 'previous-context-account' }] });
+  assert(!page.byId('summary').textContent.includes('previous-context-account'));
+});

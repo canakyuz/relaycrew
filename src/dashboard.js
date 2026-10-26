@@ -15,6 +15,8 @@
 // operator/OAuth-derived, but they still never reach innerHTML.
 
 import { createHash } from 'node:crypto';
+import { WORKSPACE_HTML, WORKSPACE_CSS } from './dashboard-shell.js';
+import { WORKSPACE_SCRIPT } from './dashboard-workspace.js';
 import { UNAVAILABLE_TEXT, RESET_CREDIT_MAX_AGE_MS, outsideSpendText, forecastText, showSessionRow, showWeeklyRow } from './status-renderer.js';
 import { USAGE_WINDOWS } from './client-usage.js';
 
@@ -753,7 +755,7 @@ const SHARED_CONSTS = [
 ].join('\n');
 
 const PAGE = `<!doctype html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -863,6 +865,7 @@ const PAGE = `<!doctype html>
   #keybox input { width: 100%; padding: 10px 12px; margin: 12px 0; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; color: var(--text); font: inherit; }
   #keybox button { padding: 8px 20px; background: var(--accent); border: 0; border-radius: 6px; color: var(--panel); font: inherit; font-weight: 600; cursor: pointer; }
   footer { color: var(--dim); font-size: 12px; margin-top: 24px; }
+${WORKSPACE_CSS}
 </style>
 <script>
 (function () {
@@ -882,57 +885,8 @@ const PAGE = `<!doctype html>
 </script>
 </head>
 <body>
-<main>
-  <div id="keybox">
-    <h1>RelayCrew</h1>
-    <p class="sub">Enter your proxy key to view status.</p>
-    <input id="key" type="password" placeholder="tc-..." autocomplete="off">
-    <br><button id="go">Connect</button>
-  </div>
-  <div id="app" style="display:none">
-    <h1>RelayCrew</h1>
-    <p class="sub" id="summary"></p>
-    <div class="actions">
-      <button id="reload" type="button">Reload config</button>
-      <button id="probe" type="button">Probe quotas</button>
-      <button id="theme" type="button" title="Switch between following the system, light and dark"></button>
-      <span class="thr">
-        <label for="thrVal">Switch at</label>
-        <input id="thrVal" type="number" min="1" max="100" step="0.1" inputmode="decimal">
-        <span>%</span>
-        <button id="thrSet" type="button">Set</button>
-      </span>
-    </div>
-    <div id="err"></div>
-    <div id="problems"></div>
-    <div id="note"></div>
-    <div id="caller" style="display:none"><span id="callerText"></span> <button id="changeKey" class="act" type="button">Change key</button></div>
-    <div id="routesWrap" style="display:none">
-      <h2>Routing</h2>
-      <div class="card" style="padding:4px 6px"><table id="routes"></table></div>
-    </div>
-    <h2>Accounts</h2>
-    <div id="accounts"></div>
-    <div id="usageViewWrap" class="actions" style="display:none"></div>
-    <div id="clientsWrap" style="display:none">
-      <h2 id="clientsHeading">Clients</h2>
-      <div class="card" style="padding:4px 6px"><table id="clients"></table></div>
-    </div>
-    <div id="dimensionsWrap"></div>
-    <div id="sessionsWrap" style="display:none">
-      <h2>Sessions</h2>
-      <div class="card" style="padding:0">
-        <div class="filters">
-          <label>Project <select id="fProject"></select></label>
-          <label>Client <select id="fClient"></select></label>
-          <span class="hint" id="sessionCount"></span>
-        </div>
-        <div style="padding:4px 6px"><table id="sessions"></table></div>
-      </div>
-    </div>
-    <footer id="foot"></footer>
-  </div>
-</main>
+${WORKSPACE_HTML}
+<script>${WORKSPACE_SCRIPT}</script>
 <script>
 (function () {
   'use strict';
@@ -1436,6 +1390,7 @@ ${SHARED_HELPERS}
     var anyUsage = Object.keys(s.clients || {}).length || Object.keys(s.usageDimensions || {}).length;
     document.getElementById('usageViewWrap').style.display = anyUsage ? '' : 'none';
     renderSessions(s.sessions);
+    if (typeof window !== 'undefined' && window.RelayWorkspace) window.RelayWorkspace.update(s);
     document.getElementById('foot').textContent = 'refreshes every ' + (POLL_MS / 1000) + 's · ' + new Date().toLocaleTimeString();
   }
 
@@ -1553,6 +1508,7 @@ ${SHARED_HELPERS}
   }
 
   function showKeybox() {
+    if (typeof window !== 'undefined' && window.RelayWorkspace) window.RelayWorkspace.signedOut();
     if (timer) { clearInterval(timer); timer = null; }
     document.getElementById('app').style.display = 'none';
     document.getElementById('keybox').style.display = 'block';
@@ -1560,8 +1516,10 @@ ${SHARED_HELPERS}
   }
 
   function poll() {
-    fetch('/relaycrew/status', { headers: { 'x-api-key': localStorage.getItem(KEY) || '' } })
+    var requestKey = localStorage.getItem(KEY) || '';
+    fetch('/relaycrew/status', { headers: { 'x-api-key': requestKey } })
       .then(function (res) {
+        if ((localStorage.getItem(KEY) || '') !== requestKey) return null;
         // 403 is the loopback exemption refusing a key-less request (a Host
         // that does not name this machine, e.g. behind a local reverse proxy
         // that adds no forwarding headers). A valid key clears that gate too.
@@ -1570,16 +1528,18 @@ ${SHARED_HELPERS}
         return res.json();
       })
       .then(function (s) {
-        if (!s) return;
+        if (!s || (localStorage.getItem(KEY) || '') !== requestKey) return;
         document.getElementById('keybox').style.display = 'none';
         document.getElementById('app').style.display = '';
         document.getElementById('err').style.display = 'none';
         render(s);
       })
       .catch(function (e) {
+        if ((localStorage.getItem(KEY) || '') !== requestKey) return;
         var err = document.getElementById('err');
         err.style.display = 'block';
-        err.textContent = 'Cannot reach the proxy: ' + e.message;
+        err.textContent = 'Não foi possível conectar ao gateway: ' + e.message + '. Nova tentativa automática em 5 segundos.';
+        if (typeof window !== 'undefined' && window.RelayWorkspace) window.RelayWorkspace.failed(e.message);
         // The banner lives inside #app, which stays hidden until a first
         // status lands; without this a first poll that fails is a blank page.
         if (document.getElementById('keybox').style.display !== 'block') document.getElementById('app').style.display = '';
@@ -1653,6 +1613,8 @@ ${SHARED_HELPERS}
       if (lastStatus) render(lastStatus);
     });
   });
+
+  if (typeof window !== 'undefined' && window.RelayWorkspace) window.RelayWorkspace.refresh = poll;
 
   // Poll before asking: a loopback browser is key-exempt, so the prompt is
   // shown only once the server refuses the request without a valid key.

@@ -46,6 +46,10 @@ node src/index.js team revoke bob
 
 Changes notify the local server. If a reload fails, the command reports that a restart is required. See [team operations](docs/teams.md) for installation on a VPS and client configuration.
 
+## Dashboard
+
+Open `/relaycrew/dashboard` on the gateway or run `node src/index.js dashboard`. The workspace includes accounts, team management, sessions, settings and historical usage distributions. Team controls use the administrator key; member keys cannot view fleet data. See the [dashboard guide](docs/dashboard.md) for operation, API contracts and historical coverage limits.
+
 ## Verify changes
 
 ```sh
