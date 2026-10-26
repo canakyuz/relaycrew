@@ -13,6 +13,8 @@ import { resetCreditTag } from '../src/tui.js';
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = Date.parse('2026-10-04T00:00:00Z');
 
+test.beforeEach(t => t.mock.method(Date, 'now', () => NOW));
+
 // The `cedar_ember` block taken from /api/oauth/usage?cedar_ember=1 on a live
 // Max account (2026-10-04). Grant `id`s and `next_grant_id` are deliberately
 // carried here, so the test below can prove they never reach the reading.

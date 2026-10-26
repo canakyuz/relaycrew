@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { closedPort } from '../test-helpers/closed-port.js';
 import http from 'node:http';
+import dns from 'node:dns';
 import { AccountManager } from '../src/account-manager.js';
 import { createProxyServer } from '../src/server.js';
 import { setUpstreamProxy, resolveUpstreamProxy, resetUpstreamProxy } from '../src/upstream-proxy.js';
@@ -15,8 +17,18 @@ function listen(server) {
 
 const accounts = (names) => names.map(n => ({ name: n, type: 'apikey', apiKey: `k-${n}` }));
 
-// A fresh name per run, so no resolver cache can answer it from a previous one.
+// Resolve the test-only .invalid names at the DNS boundary so network outages
+// cannot turn an expected NXDOMAIN into a two-minute resolver wait.
 const unresolvable = () => `http://nx-${Date.now()}-${Math.random().toString(36).slice(2)}-teamclaude.invalid`;
+
+const lookup = dns.lookup.bind(dns);
+test.beforeEach(t => t.mock.method(dns, 'lookup', (hostname, options, callback) => {
+  if (!hostname.endsWith('-teamclaude.invalid')) return lookup(hostname, options, callback);
+  const done = typeof options === 'function' ? options : callback;
+  const error = Object.assign(new Error(`getaddrinfo ENOTFOUND ${hostname}`), { code: 'ENOTFOUND', syscall: 'getaddrinfo', hostname });
+  process.nextTick(() => done(error));
+}));
+
 
 // Behind an ambient proxy a DNS failure never reaches the classification: the
 // proxy resolves the name and reports its own refusal, leaving no resolution
@@ -150,7 +162,8 @@ test('a refused connection is not walked through the fleet by an unselectable ac
   // loopback bypass changes the error shape, and this test would then be
   // measuring that instead.
   const restore = withoutAmbientProxy();
-  const proxy = createProxyServer(am, { proxy: {}, upstream: 'http://127.0.0.1:1' });
+  const upstreamPort = await closedPort();
+  const proxy = createProxyServer(am, { proxy: {}, upstream: `http://127.0.0.1:${upstreamPort}` });
   const port = await listen(proxy);
   let got;
   try {

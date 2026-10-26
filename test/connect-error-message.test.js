@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { closedPort } from '../test-helpers/closed-port.js';
 import http from 'node:http';
 import net from 'node:net';
 import { spawn } from 'node:child_process';
@@ -40,14 +41,14 @@ function listen(server) {
   return new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve(server.address().port)));
 }
 
-// `localhost` resolves to both ::1 and 127.0.0.1 on a dual-stack host, and port
-// 1 refuses on both, so this is a real all-addresses-failed connect rather than
-// a constructed one.
+// `localhost` resolves to both ::1 and 127.0.0.1 on a dual-stack host. Release
+// an OS-allocated port on both families for a real all-addresses-failed connect.
+const refusedPort = await closedPort();
 function dialRefused(opts = {}) {
   return new Promise((resolve, reject) => {
-    const s = net.connect({ host: 'localhost', port: 1, ...opts });
+    const s = net.connect({ host: 'localhost', port: refusedPort, ...opts });
     s.on('error', resolve);
-    s.on('connect', () => { s.destroy(); reject(new Error('port 1 accepted a connection')); });
+    s.on('connect', () => { s.destroy(); reject(new Error(`port ${refusedPort} accepted a connection`)); });
   });
 }
 
@@ -56,8 +57,8 @@ const probe = await dialRefused();
 const AGGREGATED = probe.constructor.name === 'AggregateError' && Array.isArray(probe.errors);
 const NOT_DUAL_STACK = !AGGREGATED
   && 'this host does not produce an all-addresses-failed connect, so nothing here would be measuring the fix';
-// The exact per-address reasons a connect to localhost:1 produces here. The
-// end-to-end tests below look for all of them, joined, rather than for a
+// The exact per-address reasons a connect to the closed localhost port produces.
+// The end-to-end tests below look for all of them, joined, rather than for a
 // substring that a single-address failure would also satisfy.
 const REASONS = AGGREGATED ? probe.errors.map(e => e.message) : [];
 
@@ -103,7 +104,7 @@ test('an upstream whose every address refuses is logged with its reasons', { ski
   const logged = [];
   const realErr = console.error;
   console.error = (...a) => logged.push(a.map(String).join(' '));
-  const proxy = createProxyServer(am, { proxy: {}, upstream: 'http://localhost:1' });
+  const proxy = createProxyServer(am, { proxy: {}, upstream: `http://localhost:${refusedPort}` });
   const port = await listen(proxy);
   try {
     await new Promise((resolve) => {
@@ -138,12 +139,12 @@ test('a forward-proxy target whose every address refuses is logged with its reas
   const realErr = console.error;
   console.error = (...a) => logged.push(a.map(String).join(' '));
   const proxy = createProxyServer(am, { proxy: {}, upstream: 'https://api.anthropic.com' });
-  allowLoopbackForward(proxy); // localhost:1 is a loopback target, refused by default
+  allowLoopbackForward(proxy); // localhost is a loopback target, refused by default
   const port = await listen(proxy);
   try {
     await new Promise((resolve) => {
       const sock = net.connect(port, '127.0.0.1', () => {
-        sock.write('GET http://localhost:1/x HTTP/1.1\r\nHost: localhost:1\r\n\r\n');
+        sock.write(`GET http://localhost:${refusedPort}/x HTTP/1.1\r\nHost: localhost:${refusedPort}\r\n\r\n`);
       });
       // The 502 arriving means the handler has already logged; waiting for the
       // socket to close instead would sit out the server's keep-alive timeout.
@@ -172,7 +173,7 @@ test('a tunnel whose every address refuses is logged with its reasons', { skip: 
   const logged = [];
   const am = new AccountManager([{ name: 'alice', type: 'apikey', apiKey: 'k1' }], 0.98);
   const server = http.createServer();
-  allowLoopbackForward(server); // localhost:1 is a loopback target, refused by default
+  allowLoopbackForward(server); // localhost is a loopback target, refused by default
   server.on('connect', createConnectHandler({
     config: { proxy: {}, upstream: 'https://api.anthropic.com' },
     accountManager: am,
@@ -183,7 +184,7 @@ test('a tunnel whose every address refuses is logged with its reasons', { skip: 
   try {
     await new Promise((resolve) => {
       const sock = net.connect(port, '127.0.0.1', () => {
-        sock.write('CONNECT localhost:1 HTTP/1.1\r\nHost: localhost:1\r\n\r\n');
+        sock.write(`CONNECT localhost:${refusedPort} HTTP/1.1\r\nHost: localhost:${refusedPort}\r\n\r\n`);
       });
       sock.on('data', () => {});
       sock.on('close', resolve);
@@ -193,7 +194,7 @@ test('a tunnel whose every address refuses is logged with its reasons', { skip: 
   } finally {
     server.close();
   }
-  const line = logged.find(l => l.includes('tunnel localhost:1 failed'));
+  const line = logged.find(l => l.includes(`tunnel localhost:${refusedPort} failed`));
   assert.ok(line, `no tunnel failure was logged at all (saw ${JSON.stringify(logged)})`);
   for (const reason of REASONS) {
     assert.ok(line.includes(reason),
@@ -212,13 +213,13 @@ const SERVER_PATH = fileURLToPath(new URL('../src/server.js', import.meta.url));
 const FETCH_PATH = fileURLToPath(new URL('../src/upstream-fetch.js', import.meta.url));
 
 function describeThroughGlobalFetch() {
-  // Port 65534 rather than 1: fetch refuses to dial port 1 at all, and would
-  // raise "bad port" instead of the connect failure this is about.
+  // The ephemeral port also avoids fetch's blocked low ports, which would
+  // raise "bad port" before attempting a connection.
   const source = `
     import { describeConnectError } from ${JSON.stringify(SERVER_PATH)};
     import { upstreamFetch } from ${JSON.stringify(FETCH_PATH)};
     try {
-      await upstreamFetch('http://localhost:65534/v1/messages', { method: 'POST', body: '{}' }, null, false);
+      await upstreamFetch('http://localhost:${refusedPort}/v1/messages', { method: 'POST', body: '{}' }, null, false);
       process.stdout.write(JSON.stringify({ error: 'the port unexpectedly accepted a connection' }));
     } catch (err) {
       process.stdout.write(JSON.stringify({
@@ -260,7 +261,7 @@ test('a connect failure through the global-fetch path is described by its parts'
     `the escape hatch did not take effect, so this proves nothing: ${JSON.stringify(got)}`);
   assert.equal(got.ownMessage, 'fetch failed',
     'the wrapper no longer hides the reason, so this test is measuring something else');
-  for (const address of ['::1:65534', '127.0.0.1:65534']) {
+  for (const address of [`::1:${refusedPort}`, `127.0.0.1:${refusedPort}`]) {
     assert.ok(got.described.includes(address),
       `"${address}" is missing from ${JSON.stringify(got.described)}`);
   }

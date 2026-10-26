@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { closedPort } from '../test-helpers/closed-port.js';
 import http from 'node:http';
 import { once } from 'node:events';
 import { createProxyServer } from '../src/server.js';
@@ -79,8 +80,8 @@ test('returns 502 (not a hang) when the target host is unreachable', async () =>
   allowLoopbackForward(proxy); // the target stands in for a remote host but lives on 127.0.0.1
   const proxyPort = await listen(proxy);
 
-  // Port 1 is not listening → connection refused.
-  const r = await proxyRequest({ proxyPort, absoluteUrl: 'http://127.0.0.1:1/' });
+  const targetPort = await closedPort();
+  const r = await proxyRequest({ proxyPort, absoluteUrl: `http://127.0.0.1:${targetPort}/` });
   assert.equal(r.status, 502);
   assert.match(r.body, /proxy_error/);
 

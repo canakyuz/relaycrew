@@ -3289,6 +3289,8 @@ async function notifyRunningServer(config) {
     const res = await fetch(`http://localhost:${port}/teamclaude/reload`, {
       method: 'POST',
       headers: { 'x-api-key': config.proxy?.apiKey || '' },
+      signal: AbortSignal.timeout(1500),
+      redirect: 'error',
     });
     if (res.ok) {
       const data = await res.json().catch(() => ({}));

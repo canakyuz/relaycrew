@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { closedPort } from '../test-helpers/closed-port.js';
 import net from 'node:net';
 import tls from 'node:tls';
 import http from 'node:http';
@@ -512,28 +513,29 @@ test('checkRouting answers an unparseable upstream URL the same way, never throw
 test('an IPv6 literal target reaches SOCKS as an address and CONNECT in brackets', T, async () => {
   // URL.hostname hands an IPv6 literal over bracketed. Left that way, SOCKS
   // would send "[::1]" to DNS as a hostname.
+  const targetPort = await closedPort();
   const socks = makeSocks5Server();
   const socksPort = await listen(socks.srv);
   const connect = makeCountingConnectProxy();
   const connectPort = await listen(connect.srv);
   try {
-    await connectThroughRouting(parseRoutingUrl(`socks5://127.0.0.1:${socksPort}`), { targetHost: '[::1]', targetPort: 9, timeout: 3000 })
+    await connectThroughRouting(parseRoutingUrl(`socks5://127.0.0.1:${socksPort}`), { targetHost: '[::1]', targetPort, timeout: 3000 })
       .then((s) => s.destroy(), () => {});
     assert.equal(socks.seen.atyp, 0x04, 'sent as an IPv6 address, not a domain');
     assert.equal(socks.seen.host, '0:0:0:0:0:0:0:1');
 
     // A mapped address (how a dual-stack resolver reports an IPv4 answer)
     // carries its dotted quad in the last two groups, not as one hex group.
-    await connectThroughRouting(parseRoutingUrl(`socks5://127.0.0.1:${socksPort}`), { targetHost: '[::ffff:127.0.0.1]', targetPort: 9, timeout: 3000 })
+    await connectThroughRouting(parseRoutingUrl(`socks5://127.0.0.1:${socksPort}`), { targetHost: '[::ffff:127.0.0.1]', targetPort, timeout: 3000 })
       .then((s) => s.destroy(), () => {});
     assert.equal(socks.seen.atyp, 0x04);
     assert.equal(socks.seen.host, '0:0:0:0:0:ffff:7f00:1');
 
     // The counting proxy cannot dial this target and never answers; what it
     // was ASKED for is the whole assertion, so a short wait is enough.
-    await connectThroughRouting(parseRoutingUrl(`http://127.0.0.1:${connectPort}`), { targetHost: '[::1]', targetPort: 9, timeout: 300 })
+    await connectThroughRouting(parseRoutingUrl(`http://127.0.0.1:${connectPort}`), { targetHost: '[::1]', targetPort, timeout: 300 })
       .then((s) => s.destroy(), () => {});
-    assert.deepEqual(connect.seen.targets, ['[::1]:9']);
+    assert.deepEqual(connect.seen.targets, [`[::1]:${targetPort}`]);
   } finally { closeHard(socks.srv); closeHard(connect.srv); }
 });
 
