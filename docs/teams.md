@@ -18,7 +18,60 @@ node src/index.js team add alice --accounts '<account-id>,<another-account-id>' 
 
 Keep `RELAYCREW_CONFIG` set for subsequent commands. Provider login uses the original interactive flows described in [accounts](accounts.md). Use only accounts your organization is authorized to use for this arrangement.
 
-Start the gateway under your service manager with `node /path/to/relaycrew/src/index.js server --headless`. Set `RELAYCREW_CONFIG` and `RELAYCREW_DISABLE_AUTOUPDATE=1` in the service environment. Bind the gateway to localhost behind HTTPS or connect through an SSH tunnel. Keep access to the protected configuration and state directory restricted to the gateway Unix user.
+## systemd on a single VPS
+
+Run the gateway as a dedicated unprivileged Unix user under a system unit. Replace the example paths and usernames with your install. Keep credentials only in the config file owned by that user (mode `0600`); do not put provider tokens or member keys in the unit file or in this repository.
+
+1. Create the user and install the checkout somewhere absolute, for example `/opt/relaycrew` owned by `relaycrew`:
+
+```sh
+sudo useradd --system --home /home/relaycrew --create-home --shell /usr/sbin/nologin relaycrew
+sudo mkdir -p /opt/relaycrew /home/relaycrew/.config/relaycrew-team
+sudo chown -R relaycrew:relaycrew /opt/relaycrew /home/relaycrew
+# Copy or clone the repo into /opt/relaycrew, then as relaycrew:
+#   umask 077
+#   export RELAYCREW_CONFIG=/home/relaycrew/.config/relaycrew-team/config.json
+#   node /opt/relaycrew/src/index.js team init && node /opt/relaycrew/src/index.js login
+```
+
+2. Install a unit at `/etc/systemd/system/relaycrew.service` (adjust `User`, paths, and Node binary):
+
+```ini
+[Unit]
+Description=RelayCrew team gateway
+Documentation=https://github.com/sep1ol/relaycrew
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=relaycrew
+Group=relaycrew
+WorkingDirectory=/opt/relaycrew
+ExecStart=/usr/bin/node /opt/relaycrew/src/index.js server --headless
+Restart=on-failure
+RestartSec=5
+Environment=RELAYCREW_CONFIG=/home/relaycrew/.config/relaycrew-team/config.json
+Environment=RELAYCREW_DISABLE_AUTOUPDATE=1
+
+[Install]
+WantedBy=multi-user.target
+```
+
+The process defaults to binding `127.0.0.1:3456` unless you set `RELAYCREW_HOST` or `proxy.host`. Prefer that localhost bind and put HTTPS in front (reverse proxy) or reach the port through SSH. Legacy `TEAMCLAUDE_*` / `TEAMROUTER_*` spellings of the same environment variables still work; prefer `RELAYCREW_*`.
+
+3. Enable and operate the service:
+
+```sh
+sudo systemd-analyze verify /etc/systemd/system/relaycrew.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now relaycrew.service
+sudo systemctl status relaycrew.service
+sudo systemctl restart relaycrew.service
+sudo journalctl -u relaycrew.service --follow
+```
+
+For a per-login user unit instead of a system unit, `relaycrew service install` writes `~/.config/systemd/user/relaycrew.service`. On a headless VPS prefer the system unit above (or enable linger for the user unit).
 
 For an SSH connection, forward the gateway port from each developer machine.
 
