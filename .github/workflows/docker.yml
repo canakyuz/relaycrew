@@ -12,6 +12,7 @@ on:
       - 'package.json'
       - 'Dockerfile'
       - 'docker-entrypoint.sh'
+      - 'test-helpers/container-health-smoke.mjs'
       - '.dockerignore'
       - '.github/workflows/docker.yml'
   pull_request:
@@ -21,6 +22,7 @@ on:
       - 'package.json'
       - 'Dockerfile'
       - 'docker-entrypoint.sh'
+      - 'test-helpers/container-health-smoke.mjs'
       - '.dockerignore'
       - '.github/workflows/docker.yml'
   workflow_dispatch:
@@ -41,6 +43,11 @@ jobs:
       artifact-metadata: write   # record it on the package page (push-to-registry: true)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify health check with private data and restricted capabilities
+        run: |
+          docker build -t relaycrew:health-smoke .
+          node test-helpers/container-health-smoke.mjs relaycrew:health-smoke
 
       - name: Read package version
         id: pkg
